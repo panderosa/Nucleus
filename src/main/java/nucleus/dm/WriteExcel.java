@@ -5,6 +5,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import jxl.CellFormat;
 import jxl.CellView;
 import jxl.Workbook;
 import jxl.WorkbookSettings;
@@ -26,14 +27,14 @@ import jxl.write.WritableWorkbook;
  *
  * @author Administrator
  */
-public class ExcelUtility {
+public class WriteExcel {
     
     private WritableCellFormat wcf, wcfh, wcf01;
     private WritableWorkbook workbook;
     private List<WritableSheet> sheets;
 
     
-    public ExcelUtility(String fileName) throws Exception {
+    public WriteExcel(String fileName) throws Exception {
         File file = new File(fileName);
         WorkbookSettings ws = new WorkbookSettings();
         ws.setLocale(new Locale("en", "EN"));
@@ -64,7 +65,7 @@ public class ExcelUtility {
         wcf01.setWrap(true);
         
     }
-       
+    
     public void addSheet(String sheetName,int seq) {
         workbook.createSheet(sheetName, seq);
         sheets.add(seq, workbook.getSheet(seq));
@@ -80,6 +81,7 @@ public class ExcelUtility {
             sheets.get(sid).setColumnView(c, s);
         }
     }
+    
     
     public void save() throws Exception {
         workbook.write();
@@ -108,7 +110,7 @@ public class ExcelUtility {
    
     public static void main(String[] args) throws Exception {
         String fileName = "c:/temp/text.xls";
-        ExcelUtility excel = new ExcelUtility(fileName);
+        WriteExcel excel = new WriteExcel(fileName);
         excel.addSheet("Test Data", 0);
         excel.addHeader(0,0,0,"UUID");
         excel.addHeader(0,1,0,"NAME");
