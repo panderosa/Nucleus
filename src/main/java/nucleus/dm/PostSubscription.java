@@ -42,16 +42,26 @@ public class PostSubscription {
     private HashMap<String,String> input;
     private Map<String,String> meta;
     private ArrayList<String> dic;
+    private String csaServer;
+    private int csaPort;
+    private String csaProtocol;
+    private String idmUser;
+    private String idmPassword;
+    private String csaConsumer;
+    private String csaConsumerPassword;
+    private String csaTenant;
+    private String onBehalfOfAnotherUser;
     
     public static void main(String[] args) throws Exception {
         PostSubscription ps = new PostSubscription(args);
         switch (ps.getOption()) {
-            case "CreateTemplate":
-                ps.createTemplate(ps.getRequest(),ps.getService(),ps.getSubscription());              
+            case "CreateTemplateFromFiles":
+                ps.createTemplateFromFiles();              
                 break;
             case "Order":
-                String jos = ps.formJsonStringForOrder();
-                System.out.print(jos);
+                //String jos = ps.buildJsonForOrder();
+                //System.out.print(jos);
+                ps.order();
                 break;
             default:
                 System.out.println("Option not supported");
@@ -61,11 +71,13 @@ public class PostSubscription {
     }
     
     public PostSubscription(String[] args) throws Exception {
-        options = Arrays.asList("CreateTemplate","Order");
+        options = Arrays.asList("CreateTemplateFromFiles","Order");
         parseArguments(args);
         input = new HashMap<>();
         initDictionary();
     }
+    
+   
     
     void parseArguments(String[] args) throws Exception {
         arguments = new HashMap<>();
@@ -82,6 +94,21 @@ public class PostSubscription {
             }
         }
         if ( errorMessage.length() > 0 ) throw new RuntimeException(errorMessage);
+    }
+    
+     void order() throws Exception {
+        String env = arguments.get("env");
+        if (env == null)
+            raiseError("Argument \"env\" is null");
+        String host = arguments.get("host");
+        String consumer = arguments.get("consumer");
+        String tenant = arguments.get("tenant");
+        String onBehalf = arguments.get("onBehalf");
+        setCSAParams(env, host, consumer, tenant, onBehalf);
+        Net net = new Net(this.csaServer,this.csaPort,this.csaProtocol);
+        net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);
+        String token = net.getRawToken();
+        System.out.println(token);
     }
     
     void initDictionary() {
@@ -107,7 +134,23 @@ public class PostSubscription {
         dic.add(18,"ORDER");
     }
     
-    void howToUse(String errorMessage) throws Exception {
+    private void setCSAParams(String file, String csaHost, String consumer, String tenant, String onBehalf) throws Exception {
+        String content = new String(Files.readAllBytes(Paths.get(file)));
+        StringReader reader = new StringReader(content);
+        JsonReader jreader = Json.createReader(reader);
+        JsonObject cnf = jreader.readObject();
+        idmUser = cnf.getJsonArray("idmUser").getString(0);
+        idmPassword = cnf.getJsonArray("idmUser").getString(1);
+        csaConsumer = (consumer == null)? cnf.getString("defaultConsumer"): consumer;
+        csaConsumerPassword = cnf.getString(this.csaConsumer);
+        csaTenant = (tenant == null)? cnf.getString("defaultTenant"): tenant;
+        csaServer = (csaHost == null)? cnf.getJsonObject("csaAS").getString("Server"): csaHost;
+        csaPort = cnf.getJsonObject("csaAS").getInt("Port");
+        csaProtocol = cnf.getJsonObject("csaAS").getString("Protocol");
+        onBehalfOfAnotherUser = onBehalf;
+    }
+    
+    void raiseError(String errorMessage) throws Exception {
         throw new RuntimeException(errorMessage);
     }
     
@@ -115,19 +158,23 @@ public class PostSubscription {
     String getOption() throws Exception {
         String opt = arguments.get("option");
         if (opt == null)
-            howToUse("Argument \"option\" is null");
+            raiseError("Argument \"option\" is null");
         else if (!options.contains(opt))
-            howToUse(String.format("Incorrect option used \"%1$s\"", opt));
+            raiseError(String.format("Incorrect option used \"%1$s\"", opt));
         return opt;
     }
     
     String getRequest() throws Exception {
         String file = arguments.get("request");
+        if ( file == null)
+            raiseError("Argument \"request\" is null.");
         return file;
     }
     
     String getService() throws Exception {
         String file = arguments.get("service");
+        if ( file == null)
+            raiseError("Argument \"service\" is null.");
         return file;
     }
     
@@ -139,43 +186,28 @@ public class PostSubscription {
     
     String getWorkbook() throws Exception {
         String file = arguments.get("workbook");
-        if (file == null)
-            howToUse(String.format("Provide workbook name"));
+        if ( file == null)
+            raiseError("Argument \"workbook\" is null.");
         return file;
     }
     
-    void createTemplate(String request, String service, String subscription) throws Exception {
-        String out = getWorkbook();
+    void createTemplateFromFiles() throws Exception {
+        String out = getWorkbook();       
         wexcel = new WriteExcel(out);
-        wexcel.addSheet(dic.get(0), 0);
         // Start from sheet 1
-        int seq = 1;
-        if ( service != null) {
-            wexcel.addSheet(dic.get(1), seq);
-            extractFieldsFromService(service,seq);
-            seq++;
-        }
-         if ( subscription != null) {
-            wexcel.addSheet(dic.get(2), seq);
-            extractFieldsFromSubscription(subscription,seq);
-            seq++;
-        }   
-        if ( request != null) {
-            wexcel.addSheet(dic.get(3), seq);
-            extractFieldsFromRequest(request,seq);
-            seq++;
-        }
-        if ( request != null || service != null ) {
-            int meta_sheet = 0;
-            createMetaDataSheet(meta_sheet); 
-            wexcel.addSheet(dic.get(4), seq);
-            generateTemplate(request, seq);
-        }
+        wexcel.addSheet(dic.get(1), 0);
+        addServiceFieldsToSheet(0); 
+        wexcel.addSheet(dic.get(3), 1);
+        addRequestOrderFieldsToSheet(1);      
+        wexcel.addSheet(dic.get(0), 2);
+        addMetaDataFieldsToSheet(2); 
+        wexcel.addSheet(dic.get(4), 3);
+        addTemplateFieldsToSheet(3);        
         wexcel.save();
     }
     
     
-    void createMetaDataSheet(int seq) throws Exception {
+    void addMetaDataFieldsToSheet(int seq) throws Exception {
         Set<String> keys = meta.keySet();
         int row = 0;
         wexcel.setColumnSize(seq, 0, 0);
@@ -196,9 +228,8 @@ public class PostSubscription {
         return input.get(name);
     }
     
-    void extractFieldsFromRequest(String file, int seq) throws Exception {
-        JsonObject order = readJsonObjectFromFile(file);
-
+    void addRequestOrderFieldsToSheet(int seq) throws Exception {
+        JsonObject order = readJsonObjectFromFile(getRequest());
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
         wexcel.setColumnSize(seq, 1, 0);
@@ -251,11 +282,11 @@ public class PostSubscription {
         meta.put(dic.get(17), "");
     }
     
-    void extractFieldsFromService(String file, int seq) throws Exception {
-        JsonObject offering = readJsonObjectFromFile(file);
+    void addServiceFieldsToSheet(int seq) throws Exception {
+        JsonObject offering = readJsonObjectFromFile(getService());
         // Meta data
         initMetaData(offering);           
-        
+      
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
         wexcel.setColumnSize(seq, 1, 0);
@@ -300,8 +331,8 @@ public class PostSubscription {
         };
     }
     
-    void extractFieldsFromSubscription(String file, int seq) throws Exception {
-        JsonArray fields = readJsonArrayFromFile(file);       
+    void extractFieldsFromSubscription(int seq) throws Exception {
+        JsonArray fields = readJsonArrayFromFile(getSubscription());       
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
         wexcel.setColumnSize(seq, 1, 0);
@@ -345,8 +376,8 @@ public class PostSubscription {
         };
     }
     
-    void generateTemplate(String file, int seq) throws Exception {
-        JsonObject order = readJsonObjectFromFile(file);
+    void addTemplateFieldsToSheet(int seq) throws Exception {
+        JsonObject order = readJsonObjectFromFile(getRequest());
         
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
@@ -402,7 +433,7 @@ public class PostSubscription {
     }
     
     
-    String formJsonStringForOrder() throws Exception {
+    String buildJsonForOrder() throws Exception {
         Map<String,String> meta = parseMetaData();     
         
         // Format JSON Body
