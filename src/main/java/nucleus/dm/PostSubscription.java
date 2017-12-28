@@ -51,6 +51,7 @@ public class PostSubscription {
     private String csaConsumerPassword;
     private String csaTenant;
     private String onBehalfOfAnotherUser;
+    private Net net;
     
     public static void main(String[] args) throws Exception {
         PostSubscription ps = new PostSubscription(args);
@@ -59,9 +60,12 @@ public class PostSubscription {
                 ps.createTemplateFromFiles();              
                 break;
             case "Order":
-                //String jos = ps.buildJsonForOrder();
-                //System.out.print(jos);
-                ps.order();
+                String jos = ps.buildJsonForOrder();
+                System.out.print(jos);
+                break;
+            case "ViewSubscription":
+                ps.connectToCSA();
+                ps.viewSubscription();
                 break;
             default:
                 System.out.println("Option not supported");
@@ -71,7 +75,7 @@ public class PostSubscription {
     }
     
     public PostSubscription(String[] args) throws Exception {
-        options = Arrays.asList("CreateTemplateFromFiles","Order");
+        options = Arrays.asList("CreateTemplateFromFiles","Order","ViewSubscription");
         parseArguments(args);
         input = new HashMap<>();
         initDictionary();
@@ -96,20 +100,29 @@ public class PostSubscription {
         if ( errorMessage.length() > 0 ) throw new RuntimeException(errorMessage);
     }
     
-     void order() throws Exception {
+     void connectToCSA() throws Exception {
         String env = arguments.get("env");
         if (env == null)
-            raiseError("Argument \"env\" is null");
+            raiseError("Argument \"env\" is null");        
         String host = arguments.get("host");
         String consumer = arguments.get("consumer");
         String tenant = arguments.get("tenant");
         String onBehalf = arguments.get("onBehalf");
         setCSAParams(env, host, consumer, tenant, onBehalf);
-        Net net = new Net(this.csaServer,this.csaPort,this.csaProtocol);
+        net = new Net(this.csaServer,this.csaPort,this.csaProtocol);
         net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);
-        String token = net.getRawToken();
-        System.out.println(token);
+        
     }
+     
+    void viewSubscription() throws Exception {
+        String uuid = arguments.get("uuid");
+        if (uuid == null)
+            raiseError("Argument subscription \"uuid\" is null");
+        String token = net.getToken();
+        String uri = "/csa/api/mpp/mpp-subscription/" + uuid;
+        String out = net.getHttp(token, null, null, uri, "application/json");
+        System.out.println(out);
+    } 
     
     void initDictionary() {
         dic = new ArrayList();
