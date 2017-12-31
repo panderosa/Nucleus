@@ -50,6 +50,7 @@ public class Net {
     }
     
     public Net(String host, int port, String protocol) throws Exception {
+        token = null;
         this.protocol = protocol;
         targetHost = new HttpHost(host,port,protocol);
         initializeHttpClient();
