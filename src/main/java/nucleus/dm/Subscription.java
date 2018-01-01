@@ -34,7 +34,8 @@ import javax.json.JsonWriter;
  *
  * @author Administrator
  */
-public class PostSubscription {
+public class Subscription {
+    private final String BOUNDARY = "AlaMaKota123";
     private HashMap<String,String> arguments;
     private WriteExcel wexcel;
     private ReadExcel rexcel;
@@ -48,6 +49,8 @@ public class PostSubscription {
     private String idmPassword;
     private String csaConsumer;
     private String csaConsumerPassword;
+    private String csaAdmin;
+    private String csaAdminPassword;
     private String csaTenant;
     private String onBehalf;
     private Net net;
@@ -55,32 +58,37 @@ public class PostSubscription {
     private long start;
     
     public static void main(String[] args) throws Exception {
-        PostSubscription ps = new PostSubscription(args);
+        Subscription ps = new Subscription(args);
         switch (ps.getOption()) {
-            case "Order":
-                String payload = ps.buildJsonForOrder();
-                ps.writeStringToFile(payload);
-                String np = ps.readStringFromFile();
-                String out = ps.postSub(np);
+            case "order":
+                ps.orderSubscription();
                 break;
-            case "CreateTemplate":
-                ps.createTemplateForOrder();
+            case "cancel":
+                ps.cancelSubscription();
+                break;
+            case "template":
+                ps.CreateTemplate();
                 break;
             default:
-                String pyl = ps.readStringFromFile();
-                Net net = new Net("uspnvucsa006.devp.dbn.hpe.com",8444,"https");
-                net.requestToken("idmTransportUser", "ENC(n06qovMG761VhGVf44wDq2oY4yPfBhMDBQDtAlZePQk=)", "svc-afcsa", "ENC(1cWA2ObRUWoK20sEy4bECnLU/M2zlJAz/BDZxkyMIYI=)", "NUCLEUS");
-                String token = net.getToken();
-                String uri = "/csa/api/mpp/mpp-request/022e2ce75eee2728015f05ec8604323a?catalogId=022e2ce75b337e52015b33862e4e000b";
+                //String pyl = ps.readStringFromFile();
+                ps.initMetaFromExcel();
+                String pyl = ps.buildJsonFromExcel();
+                //System.out.println(pyl);
+                //Net net = new Net("uspnvucsa006.devp.dbn.hpe.com",8444,"https");
+                ps.initCSA();
+                ps.net.requestToken(ps.idmUser, ps.idmPassword, ps.csaConsumer, ps.csaConsumerPassword, ps.csaTenant);
+                String token = ps.net.getToken();
+                String uri = "/csa/api/mpp/mpp-request/" + ps.meta.get("serviceId") + "?catalogId=" + ps.meta.get("catalogId");
                 String ac = "application/json";
-                String cnt = "multipart/form-data; boundary=AlaMaKOta123";
-                String output = net.postHttp(token, null, null, uri, pyl, ac, cnt);
+                String cnt = "multipart/form-data; boundary=" + ps.BOUNDARY;
+                String output = ps.net.postHttp(token, null, null, uri, pyl, ac, cnt);
                 System.out.println(output);
+
                 
         }
     }
     
-    public PostSubscription(String[] args) throws Exception {
+    public Subscription(String[] args) throws Exception {
         parseArguments(args);
         input = new HashMap<>();
         initDictionary();
@@ -104,7 +112,7 @@ public class PostSubscription {
         if ( errorMessage.length() > 0 ) throw new RuntimeException(errorMessage);
     }
     
-    void createTemplateForOrder() throws Exception {
+    void CreateTemplate() throws Exception {
         JsonObject offering = getOffering();
         JsonObject request = getOrder();
         
@@ -153,8 +161,25 @@ public class PostSubscription {
         return out;
     }
     
+    private void setCSAParams(String file, String host, String consumer, String tenant, String onBehalf) throws Exception {
+        String content = new String(Files.readAllBytes(Paths.get(file)));
+        StringReader reader = new StringReader(content);
+        JsonReader jreader = Json.createReader(reader);
+        JsonObject cnf = jreader.readObject();
+        idmUser = cnf.getJsonArray("idmUser").getString(0);
+        idmPassword = cnf.getJsonArray("idmUser").getString(1);
+        csaConsumer = (consumer == null)? cnf.getString("defaultConsumer"): consumer;
+        csaConsumerPassword = cnf.getString(csaConsumer);
+        csaAdmin = cnf.getString("defaultPrivilegedUser");
+        csaAdminPassword = cnf.getString(csaAdmin);
+        csaTenant = (tenant == null)? cnf.getString("defaultTenant"): tenant;
+        csaServer = (host == null)? cnf.getJsonObject("csaAS").getString("Server"): host;
+        csaPort = cnf.getJsonObject("csaAS").getInt("Port");
+        csaProtocol = cnf.getJsonObject("csaAS").getString("Protocol");
+        this.onBehalf = onBehalf;
+    }
     
-    void connectToCSA() throws Exception {
+    void initCSA() throws Exception {
         String env = arguments.get("env");
         if (env == null)
             raiseError("Argument \"env\" is null");        
@@ -173,7 +198,7 @@ public class PostSubscription {
     String viewSubscription() throws Exception {
         String uuid = arguments.get("uuid");
         if (uuid == null) raiseError("Argument subscription \"uuid\" is null");
-        if (net == null) connectToCSA();
+        if (net == null) initCSA();
         if (net.getRawToken() == null) {
             System.out.print("Retrieving token from CSA.");
             stoper();
@@ -193,7 +218,7 @@ public class PostSubscription {
     }    
     
     String viewOrder() throws Exception {
-        if (net == null) connectToCSA();
+        if (net == null) initCSA();
         if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);   
         String requestId = subscription.getString("requestId");        
         String uri = "/csa/api/mpp/mpp-request/" + requestId;
@@ -208,7 +233,7 @@ public class PostSubscription {
     }
     
     String viewOffering() throws Exception {
-        if (net == null) connectToCSA();
+        if (net == null) initCSA();
         if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);   
         String offeringId = subscription.getString("serviceId");
         String catalogId = subscription.getString("catalogId");
@@ -259,21 +284,6 @@ public class PostSubscription {
         dic.add(19,"AlaMaKOta123");
     }
     
-    private void setCSAParams(String file, String csaHost, String consumer, String tenant, String onBehalf) throws Exception {
-        String content = new String(Files.readAllBytes(Paths.get(file)));
-        StringReader reader = new StringReader(content);
-        JsonReader jreader = Json.createReader(reader);
-        JsonObject cnf = jreader.readObject();
-        idmUser = cnf.getJsonArray("idmUser").getString(0);
-        idmPassword = cnf.getJsonArray("idmUser").getString(1);
-        csaConsumer = (consumer == null)? cnf.getString("defaultConsumer"): consumer;
-        csaConsumerPassword = cnf.getString(this.csaConsumer);
-        csaTenant = (tenant == null)? cnf.getString("defaultTenant"): tenant;
-        csaServer = (csaHost == null)? cnf.getJsonObject("csaAS").getString("Server"): csaHost;
-        csaPort = cnf.getJsonObject("csaAS").getInt("Port");
-        csaProtocol = cnf.getJsonObject("csaAS").getString("Protocol");
-        this.onBehalf = onBehalf;
-    }
     
     void raiseError(String errorMessage) throws Exception {
         throw new RuntimeException(errorMessage);
@@ -469,36 +479,39 @@ public class PostSubscription {
         }
     }
     
-    Map<String,String> getMetaForTemplate() throws Exception {
+    void initMetaFromExcel() throws Exception {
         String out = getWorkbookName();
-        rexcel = new ReadExcel(out);
+        if (rexcel == null) rexcel = new ReadExcel(out);
         rexcel.setSheet("Metadata", 0);
         String[] params = rexcel.readColumn(0);
         String[] paramValues = rexcel.readColumn(1);
-        Map<String,String> meta = new HashMap<>();
+        meta = new HashMap<>();
         for ( int j = 0; j < params.length; j++ ) {
             meta.put(params[j], paramValues[j]);
         }
-        return meta;
     }
     
     
-    String buildJsonForOrder() throws Exception {
-        Map<String,String> meta = getMetaForTemplate();     
+    String buildJsonFromExcel() throws Exception {   
         // Format JSON Body
-        String boundary = dic.get(19);
+
         StringBuilder sb = new StringBuilder();
-        sb.append("--"+boundary+"\n");
+        sb.append("--"+BOUNDARY+"\n");
         sb.append("Content-Disposition: form-data; name=\"requestForm\"\n");
         sb.append("Content-Type: text/json\n\n");
        
         sb.append("{\n")
-                .append(String.format("\"action\": \"%s\",%n", dic.get(18)))
-                .append(String.format("\"%s\": \"%s\",%n", dic.get(10), meta.get(dic.get(10))))
-                .append(String.format("\"%s\": \"%s\",%n", dic.get(15), meta.get(dic.get(15))))
-                .append(String.format("\"%s\": \"%s\",%n", dic.get(16), meta.get(dic.get(16))))
-                .append(String.format("\"%s\": \"%s\",%n", dic.get(17), meta.get(dic.get(17))))
+                .append(String.format("\"action\": \"%s\",%n", "ORDER"))
+                .append(String.format("\"categoryName\": \"%s\",%n", meta.get("categoryName")))
+                .append(String.format("\"subscriptionName\": \"%s\",%n", meta.get("subscriptionName")))
+                .append(String.format("\"subscriptionDescription\": \"%s\",%n", meta.get("subscriptionDescription")))
+                .append(String.format("\"startDate\": \"%s\",%n", meta.get("startDate")))
                 .append("\"fields\": {\n");                  
+        // Read fields from workbook
+        if (rexcel == null) {
+            String out = getWorkbookName();
+            rexcel = new ReadExcel(out);
+        }
         rexcel.setSheet(dic.get(4), 0);
         String[] ids = rexcel.readColumn(0);
         String[] values = rexcel.readColumn(3);
@@ -510,7 +523,7 @@ public class PostSubscription {
         }
         sb.append("}\n")
                 .append("}\n\n")
-                .append("--"+boundary+"--");        
+                .append("--"+BOUNDARY+"--");        
         return sb.toString();
     }
     
@@ -524,26 +537,66 @@ public class PostSubscription {
         return new String(bytes,"UTF-8");
     }
     
-    String postSub(String payload) throws Exception {
-        Map<String,String> meta = getMetaForTemplate();
-        String uri = String.format("/csa/api/mpp/mpp-request/%s?catalogId=%s",meta.get("serviceId"),meta.get("catalogId"));
-        String contentType = "multipart/form-data; boundary=" + dic.get(19);
-        if (net == null) connectToCSA();
-        if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);
-        String token = net.getToken();
-        System.out.println(uri);
-        System.out.println(contentType);
-        System.out.println(payload);
-        System.out.print("Ordering subscription in CSA.");
+    void orderSubscription() throws Exception {
+        initMetaFromExcel();
+        String pyl = buildJsonFromExcel();
+        initCSA();
+        String token = requestToken();
+        String uri = "/csa/api/mpp/mpp-request/" + meta.get("serviceId") + "?catalogId=" + meta.get("catalogId");
+        String ac = "application/json";
+        String cnt = "multipart/form-data; boundary=" + BOUNDARY;
+        System.out.print("Ordering subscription.");
         stoper();
-        String out = net.putHttp(token, null, null, uri, payload, "application/json", contentType);
-        int delta = stoper();
-        System.out.format(" Duration(ms) %d%n",delta);
-        return out;
+        String output = net.postHttp(token, null, null, uri, pyl, ac, cnt);
+        int del = stoper();
+        System.out.format(" Duration(ms) %d%n",del);
+        System.out.println(output);
+    }
+    
+    /*void cancelSubscription() throws Exception {
+        String uuid = arguments.get("uuid");
+        if (uuid == null) raiseError("Argument subscription \"uuid\" is null");
+        initCSA();
+        String token = requestToken();
+        String uri = "/csa/api/mpp/mpp-request/" + uuid;
+        String ac = "application/json";
+        String cnt = "multipart/form-data; boundary=" + BOUNDARY;
+        StringBuilder sb = new StringBuilder();
+        sb.append("--"+BOUNDARY+"\n");
+        sb.append("Content-Disposition: form-data; name=\"requestForm\"\n");
+        sb.append("Content-Type: text/json\n\n");       
+        sb.append("{\n")
+                .append(String.format("\"action\": \"%s\"%n", "CANCEL_SUBSCRIPTION"))
+                .append("}\n\n")
+                .append("--"+BOUNDARY+"--");  
+        String payload = sb.toString();
+        String output = net.postHttp(token, null, null, uri, payload, ac, cnt);
+        System.out.println(output);
+    }*/
+    
+    // csa/api/service/subscription/402886a160784ae40160b258c3ef1bc4/cancel
+    void cancelSubscription() throws Exception {
+        String uuid = arguments.get("uuid");
+        if (uuid == null) raiseError("Argument subscription \"uuid\" is null");
+        initCSA();
+        String uri = "/csa/api/service/subscription/" + uuid + "/cancel";
+        String ac = "*/*";
+        String cnt = "application/json"; 
+        String payload = "";
+        String output = net.postHttp(null, this.csaAdmin, this.csaAdminPassword, uri, payload, ac, cnt);
+        System.out.println(output);
     }
     
     
-    
+    String requestToken() throws Exception {
+        System.out.print("Requesting CSA Token.");
+        stoper();
+        net.requestToken(idmUser, idmPassword, csaConsumer, csaConsumerPassword, csaTenant);
+        int delta = stoper();
+        System.out.format(" Duration(ms) %d%n",delta);
+        return net.getToken();
+    }
+            
     
     String jsonToString(JsonObject jo) {
         StringWriter writer = new StringWriter();
