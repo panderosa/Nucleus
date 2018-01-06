@@ -6,6 +6,8 @@
 package nucleus.dm;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.file.Files;
@@ -47,10 +49,13 @@ public class Subscription {
     private String csaProtocol;
     private String idmUser;
     private String idmPassword;
+    private String transportUser;
+    private String transportPassword;
     private String csaConsumer;
     private String csaConsumerPassword;
     private String csaAdmin;
     private String csaAdminPassword;
+    private String csaAdminOrg;
     private String csaTenant;
     private String onBehalf;
     private Net net;
@@ -68,6 +73,9 @@ public class Subscription {
                 break;
             case "template":
                 ps.CreateTemplate();
+                break;
+            case "availableValues":
+                ps.availableValues();
                 break;
             default:
                 //String pyl = ps.readStringFromFile();
@@ -161,21 +169,45 @@ public class Subscription {
         return out;
     }
     
-    private void setCSAParams(String file, String host, String consumer, String tenant, String onBehalf) throws Exception {
+    private void _setCSAParams(String file, String host, String consumer, String tenant, String onBehalf) throws Exception {
         String content = new String(Files.readAllBytes(Paths.get(file)));
         StringReader reader = new StringReader(content);
         JsonReader jreader = Json.createReader(reader);
         JsonObject cnf = jreader.readObject();
         idmUser = cnf.getJsonArray("idmUser").getString(0);
         idmPassword = cnf.getJsonArray("idmUser").getString(1);
+        transportUser = cnf.getJsonArray("transportUser").getString(0);
+        transportPassword = cnf.getJsonArray("transportUser").getString(1);
         csaConsumer = (consumer == null)? cnf.getString("defaultConsumer"): consumer;
         csaConsumerPassword = cnf.getString(csaConsumer);
         csaAdmin = cnf.getString("defaultPrivilegedUser");
         csaAdminPassword = cnf.getString(csaAdmin);
+        csaAdminOrg = cnf.getString("defaultAdminOrganization");
         csaTenant = (tenant == null)? cnf.getString("defaultTenant"): tenant;
         csaServer = (host == null)? cnf.getJsonObject("csaAS").getString("Server"): host;
         csaPort = cnf.getJsonObject("csaAS").getInt("Port");
         csaProtocol = cnf.getJsonObject("csaAS").getString("Protocol");
+        this.onBehalf = onBehalf;
+    }
+    
+    
+    private void setCSAParams(String file, String host, String consumer, String tenant, String onBehalf) throws Exception {
+        byte[] content = Files.readAllBytes(Paths.get(file));
+        ObjectMapper mapper = new ObjectMapper();
+        HashMap<String,Object> cnf = mapper.readValue(content, HashMap.class);
+        idmUser = ((ArrayList<String>)cnf.get("idmUser")).get(0);
+        idmPassword = ((ArrayList<String>)cnf.get("idmUser")).get(1);
+        transportUser = ((ArrayList<String>)cnf.get("transportUser")).get(0);
+        transportPassword = ((ArrayList<String>)cnf.get("transportUser")).get(1);
+        csaConsumer = (consumer == null)? (String) cnf.get("defaultConsumer"): consumer;
+        csaConsumerPassword = (String) cnf.get("csaConsumer");
+        csaAdmin = (String) cnf.get("defaultPrivilegedUser");
+        csaAdminPassword = (String) cnf.get("csaAdmin");
+        csaAdminOrg = (String) cnf.get("defaultAdminOrganization");
+        csaTenant = (tenant == null)? (String) cnf.get("defaultTenant"): tenant;
+        csaServer = (host == null)? (String) ((HashMap<String,Object>) cnf.get("csaAS")).get("Server"): host;
+        csaPort = ((Integer) ((HashMap<String,Object>) cnf.get("csaAS")).get("Port")).intValue();
+        csaProtocol = (String) ((HashMap<String,Object>) cnf.get("csaAS")).get("Protocol");
         this.onBehalf = onBehalf;
     }
     
@@ -553,28 +585,6 @@ public class Subscription {
         System.out.println(output);
     }
     
-    /*void cancelSubscription() throws Exception {
-        String uuid = arguments.get("uuid");
-        if (uuid == null) raiseError("Argument subscription \"uuid\" is null");
-        initCSA();
-        String token = requestToken();
-        String uri = "/csa/api/mpp/mpp-request/" + uuid;
-        String ac = "application/json";
-        String cnt = "multipart/form-data; boundary=" + BOUNDARY;
-        StringBuilder sb = new StringBuilder();
-        sb.append("--"+BOUNDARY+"\n");
-        sb.append("Content-Disposition: form-data; name=\"requestForm\"\n");
-        sb.append("Content-Type: text/json\n\n");       
-        sb.append("{\n")
-                .append(String.format("\"action\": \"%s\"%n", "CANCEL_SUBSCRIPTION"))
-                .append("}\n\n")
-                .append("--"+BOUNDARY+"--");  
-        String payload = sb.toString();
-        String output = net.postHttp(token, null, null, uri, payload, ac, cnt);
-        System.out.println(output);
-    }*/
-    
-    // csa/api/service/subscription/402886a160784ae40160b258c3ef1bc4/cancel
     void cancelSubscription() throws Exception {
         String uuid = arguments.get("uuid");
         if (uuid == null) raiseError("Argument subscription \"uuid\" is null");
@@ -587,6 +597,30 @@ public class Subscription {
         System.out.println(output);
     }
     
+    void availableValues() throws Exception {
+        String id = arguments.get("id");
+        if (id == null) raiseError("Argument field \"id\" is null");
+        initCSA();
+        String input = arguments.get("input");
+        String fields = (input != null)? input.replaceAll("::", "="): "name=value";
+        String uid = getUserId();
+        String uri = "/csa/rest/availablevalues/" + id + "?userIdentifier=" + uid;
+        System.out.println(uri);
+        String cnt = "application/json";
+        String output = net.postHttp(null, transportUser, transportPassword, uri, fields, cnt, cnt);
+        System.out.println(output);
+    }
+    
+    String getUserId() throws Exception {
+        System.out.print("Retrieving CSA User Identifier for REST Operations.");
+        String ac = "application/json";
+        String uri = "/csa/rest/login/" + csaAdminOrg + "/" + csaAdmin + "/";
+        stoper();        
+        String output = net.getHttp(null, transportUser, transportPassword, uri, ac);
+        int delta = stoper();
+        System.out.format(" Duration(ms) %d%n",delta);
+        return stringToJson(output).getString("id");
+    }
     
     String requestToken() throws Exception {
         System.out.print("Requesting CSA Token.");
