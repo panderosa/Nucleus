@@ -3,8 +3,10 @@ package nucleus.dm;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import jxl.CellFormat;
 import jxl.CellView;
 import jxl.Workbook;
@@ -12,6 +14,8 @@ import jxl.WorkbookSettings;
 import jxl.format.Colour;
 import jxl.format.UnderlineStyle;
 import jxl.write.Label;
+import jxl.write.Number;
+import jxl.write.Boolean;
 import jxl.write.WritableCellFormat;
 import jxl.write.WritableFont;
 import jxl.write.WritableSheet;
@@ -31,7 +35,14 @@ public class WriteExcel {
     
     private WritableCellFormat wcf, wcfh, wcf01;
     private WritableWorkbook workbook;
-    private List<WritableSheet> sheets;
+    private List<WritableSheet> sheets; 
+    public enum CellFormats {
+        HeaderYellowBold,
+        DataNoWrap,
+        DataWrap;
+    }
+    private Map<CellFormats,WritableCellFormat> formats;
+    
 
     
     public WriteExcel(String fileName) throws Exception {
@@ -39,30 +50,26 @@ public class WriteExcel {
         WorkbookSettings ws = new WorkbookSettings();
         ws.setLocale(new Locale("en", "EN"));
         workbook = Workbook.createWorkbook(file, ws);
-        sheets = new ArrayList<>();
-        /*workbook.createSheet(sName, 0);
-        sheet = workbook.getSheet(0);*/
-        /*CellView cv = new CellView();
-        cv.setAutosize(true);
-        for ( int i = 0; i < cols ; i++) {
-            sheet.setColumnView(i, cv);
-        }*/      
+        sheets = new ArrayList<>();   
         
         // Set Format for Headers
         WritableFont wfh = new WritableFont(WritableFont.TIMES,10,WritableFont.BOLD,false,UnderlineStyle.NO_UNDERLINE,Colour.BLACK);
         wcfh = new WritableCellFormat(wfh);
-        wcfh.setBackground(Colour.YELLOW);
-        
+        wcfh.setBackground(Colour.YELLOW);       
         
         // Set format for data
         WritableFont wf = new WritableFont(WritableFont.TIMES,10,WritableFont.NO_BOLD,false,UnderlineStyle.NO_UNDERLINE,Colour.BLACK);
         wcf = new WritableCellFormat(wf);
         wcf.setWrap(false);
         
-        
         // Set format for data
         wcf01 = new WritableCellFormat(wf);
         wcf01.setWrap(true);
+        
+        formats = new HashMap<>();
+        formats.put(CellFormats.HeaderYellowBold, wcfh);
+        formats.put(CellFormats.DataNoWrap, wcf);
+        formats.put(CellFormats.DataWrap, wcf01);
         
     }
     
@@ -99,6 +106,22 @@ public class WriteExcel {
         label = new Label(c,r,txt,wcf);
         sheets.get(sid).addCell(label);
     }
+    
+    public void addString(int sid, int c,int r, String txt, CellFormats cf) throws Exception {
+        Label label = new Label(c,r,txt,formats.get(cf));
+        sheets.get(sid).addCell(label);        
+    }
+    
+    public void addNumber(int sid, int c,int r, double txt, CellFormats cf) throws Exception {
+        Number cnt = new Number(c,r,txt,formats.get(cf));
+        sheets.get(sid).addCell(cnt);        
+    }
+    
+    public void addBoolean(int sid, int c,int r, boolean txt, CellFormats cf) throws Exception {
+        Boolean cnt = new Boolean(c,r,txt,formats.get(cf));
+        sheets.get(sid).addCell(cnt);        
+    }
+    
     
     public void addContentNw(int sid, int c,int r, String txt) throws Exception {
         Label label;

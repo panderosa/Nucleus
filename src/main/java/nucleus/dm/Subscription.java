@@ -8,40 +8,23 @@ package nucleus.dm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.StringReader;
-import java.io.StringWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.JsonNodeType;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import javax.json.Json;
-import javax.json.JsonReader;
-import javax.json.JsonObject;
-import javax.json.JsonArray;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
-import javax.json.JsonNumber;
-import javax.json.JsonObjectBuilder;
-import javax.json.JsonString;
-import javax.json.JsonValue;
-import javax.json.JsonWriter;
 
 
-
-/**
- *
- * @author Administrator
- */
 public class Subscription {
     private final String BOUNDARY = "AlaMaKota123";
     private HashMap<String,String> arguments;
     private WriteExcel wexcel;
     private ReadExcel rexcel;
-    private HashMap<String,String> input;
     private Map<String,String> meta;
     private ArrayList<String> dic;
     private String csaServer;
@@ -59,8 +42,9 @@ public class Subscription {
     private String csaTenant;
     private String onBehalf;
     private Net net;
-    private JsonObject subscription;
+    private JsonNode subscription;
     private long start;
+    private Map<String,String> input;
     
     public static void main(String[] args) throws Exception {
         Subscription ps = new Subscription(args);
@@ -78,28 +62,25 @@ public class Subscription {
                 ps.availableValues();
                 break;
             default:
-                //String pyl = ps.readStringFromFile();
                 ps.initMetaFromExcel();
-                String pyl = ps.buildJsonFromExcel();
-                //System.out.println(pyl);
+                String pyl = ps.buildOrderPayload();
+                //String pyl = ps.readStringFromFile();
+                System.out.println(pyl);
                 //Net net = new Net("uspnvucsa006.devp.dbn.hpe.com",8444,"https");
-                ps.initCSA();
+                /*ps.initCSA();
                 ps.net.requestToken(ps.idmUser, ps.idmPassword, ps.csaConsumer, ps.csaConsumerPassword, ps.csaTenant);
                 String token = ps.net.getToken();
                 String uri = "/csa/api/mpp/mpp-request/" + ps.meta.get("serviceId") + "?catalogId=" + ps.meta.get("catalogId");
                 String ac = "application/json";
                 String cnt = "multipart/form-data; boundary=" + ps.BOUNDARY;
                 String output = ps.net.postHttp(token, null, null, uri, pyl, ac, cnt);
-                System.out.println(output);
-
-                
+                System.out.println(output);*/       
         }
     }
     
     public Subscription(String[] args) throws Exception {
         parseArguments(args);
         input = new HashMap<>();
-        initDictionary();
     }    
     
     
@@ -121,75 +102,61 @@ public class Subscription {
     }
     
     void CreateTemplate() throws Exception {
-        JsonObject offering = getOffering();
-        JsonObject request = getOrder();
+        JsonNode offering = getOffering();
+        JsonNode request = getOrder();
         
         String out = getWorkbookName();       
         wexcel = new WriteExcel(out);
         
         // Service Offering sheet
-        wexcel.addSheet(dic.get(1), 0);       
+        wexcel.addSheet("Service Offering", 0);       
         addOfferingFields(0,offering); 
         
         // Request Order sheet
-        wexcel.addSheet(dic.get(3), 1);       
+        wexcel.addSheet("Request Order", 1);       
         addRequestFields(1,request);      
         
         // Meta sheet
-        wexcel.addSheet(dic.get(0), 2);         
+        wexcel.addSheet("Metadata", 2);         
         addMetaFields(2,offering); 
         
         // New Order Template
-        wexcel.addSheet(dic.get(4), 3);
+        wexcel.addSheet("New Order Template", 3);
         addTemplateFieldsToSheet(3,request);        
         
         // Save Workbook
         wexcel.save();
     }
     
-    JsonObject getOrder() throws Exception {
-        JsonObject out = null;
-        if (arguments.get("source").equalsIgnoreCase("file"))
-            out = readJsonObjectFromFile(getOrderFileName());
+    JsonNode getOrder() throws Exception {
+        JsonNode out = null;
+        ObjectMapper mapper = new ObjectMapper();
+        if (arguments.get("source").equalsIgnoreCase("file")) {
+            String file = getOrderFileName();
+            byte[] jc = Files.readAllBytes(Paths.get(file));
+            out = mapper.readTree(jc);
+        }
         else if (arguments.get("source").equalsIgnoreCase("csa")) {
             if (subscription == null) viewSubscription();
-            out = stringToJson(viewOrder());
+            out = mapper.readTree(viewOrder());
         }
         return out;    
     }
     
-    JsonObject getOffering() throws Exception {
-        JsonObject out = null;
-        if (arguments.get("source").equalsIgnoreCase("file"))
-            out = readJsonObjectFromFile(getOfferingFileName());
+    JsonNode getOffering() throws Exception {
+        JsonNode out = null;
+        ObjectMapper mapper = new ObjectMapper();
+        if (arguments.get("source").equalsIgnoreCase("file")) {
+            String file = getOfferingFileName();
+            byte[] jc = Files.readAllBytes(Paths.get(file));
+            out = mapper.readTree(jc);
+        }
         else if (arguments.get("source").equalsIgnoreCase("csa")) {
             if (subscription == null) viewSubscription();
-            out = stringToJson(viewOffering());
+            out = mapper.readTree(viewOffering());
         }
         return out;
     }
-    
-    private void _setCSAParams(String file, String host, String consumer, String tenant, String onBehalf) throws Exception {
-        String content = new String(Files.readAllBytes(Paths.get(file)));
-        StringReader reader = new StringReader(content);
-        JsonReader jreader = Json.createReader(reader);
-        JsonObject cnf = jreader.readObject();
-        idmUser = cnf.getJsonArray("idmUser").getString(0);
-        idmPassword = cnf.getJsonArray("idmUser").getString(1);
-        transportUser = cnf.getJsonArray("transportUser").getString(0);
-        transportPassword = cnf.getJsonArray("transportUser").getString(1);
-        csaConsumer = (consumer == null)? cnf.getString("defaultConsumer"): consumer;
-        csaConsumerPassword = cnf.getString(csaConsumer);
-        csaAdmin = cnf.getString("defaultPrivilegedUser");
-        csaAdminPassword = cnf.getString(csaAdmin);
-        csaAdminOrg = cnf.getString("defaultAdminOrganization");
-        csaTenant = (tenant == null)? cnf.getString("defaultTenant"): tenant;
-        csaServer = (host == null)? cnf.getJsonObject("csaAS").getString("Server"): host;
-        csaPort = cnf.getJsonObject("csaAS").getInt("Port");
-        csaProtocol = cnf.getJsonObject("csaAS").getString("Protocol");
-        this.onBehalf = onBehalf;
-    }
-    
     
     private void setCSAParams(String file, String host, String consumer, String tenant, String onBehalf) throws Exception {
         byte[] content = Files.readAllBytes(Paths.get(file));
@@ -200,9 +167,9 @@ public class Subscription {
         transportUser = ((ArrayList<String>)cnf.get("transportUser")).get(0);
         transportPassword = ((ArrayList<String>)cnf.get("transportUser")).get(1);
         csaConsumer = (consumer == null)? (String) cnf.get("defaultConsumer"): consumer;
-        csaConsumerPassword = (String) cnf.get("csaConsumer");
+        csaConsumerPassword = (String) cnf.get(csaConsumer);
         csaAdmin = (String) cnf.get("defaultPrivilegedUser");
-        csaAdminPassword = (String) cnf.get("csaAdmin");
+        csaAdminPassword = (String) cnf.get(csaAdmin);
         csaAdminOrg = (String) cnf.get("defaultAdminOrganization");
         csaTenant = (tenant == null)? (String) cnf.get("defaultTenant"): tenant;
         csaServer = (host == null)? (String) ((HashMap<String,Object>) cnf.get("csaAS")).get("Server"): host;
@@ -234,7 +201,8 @@ public class Subscription {
         if (net.getRawToken() == null) {
             System.out.print("Retrieving token from CSA.");
             stoper();
-            net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);
+            //System.out.println(idmUser+"|"+idmPassword+"|"+csaConsumer+"|"+csaConsumerPassword+"|"+csaTenant);
+            net.requestToken(idmUser, idmPassword, csaConsumer, csaConsumerPassword, csaTenant);
             int delta = stoper();
             System.out.format(" Duration(ms) %d%n",delta);
         }       
@@ -243,7 +211,8 @@ public class Subscription {
         System.out.print("Retrieving subscription details from CSA.");
         stoper();
         String out = net.getHttp(token, null, null, uri, "application/json");
-        subscription = stringToJson(out);
+        ObjectMapper mapper = new ObjectMapper();
+        subscription = mapper.readTree(out);
         int delta = stoper();
         System.out.format(" Duration(ms) %d%n",delta);
         return out;
@@ -252,7 +221,7 @@ public class Subscription {
     String viewOrder() throws Exception {
         if (net == null) initCSA();
         if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);   
-        String requestId = subscription.getString("requestId");        
+        String requestId = subscription.get("requestId").asText();
         String uri = "/csa/api/mpp/mpp-request/" + requestId;
         uri = (onBehalf != null)? uri + "?onBehalf=" + onBehalf: uri;
         String token = net.getToken();
@@ -267,10 +236,10 @@ public class Subscription {
     String viewOffering() throws Exception {
         if (net == null) initCSA();
         if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);   
-        String offeringId = subscription.getString("serviceId");
-        String catalogId = subscription.getString("catalogId");
-        String category = subscription.getJsonObject("category").getString("name");
-        String uri = String.format("/csa/api/mpp/mpp-offering/%s?catalogId=%s&category=%s",offeringId,catalogId,category);
+        String serviceId = subscription.get("serviceId").asText();
+        String catalogId = subscription.get("catalogId").asText();
+        String categoryName = subscription.get("category").get("name").asText();
+        String uri = String.format("/csa/api/mpp/mpp-offering/%s?catalogId=%s&category=%s",serviceId,catalogId,categoryName);
         uri = (onBehalf != null)? uri + "&onBehalf=" + onBehalf: uri;
         String token = net.getToken();
         System.out.print("Retrieving service offering details from CSA.");
@@ -290,32 +259,7 @@ public class Subscription {
             start = 0;
         }
         return delta;
-    }
-    
-    void initDictionary() {
-        dic = new ArrayList();
-        dic.add(0,"Metadata");
-        dic.add(1,"Service Offering");
-        dic.add(2,"Subscription Fields");
-        dic.add(3,"Request Order");
-        dic.add(4,"New Order Template");
-        dic.add(5,"Field Identifier");
-        dic.add(6,"Field Name");
-        dic.add(7,"Display Name");
-        dic.add(8,"Field Value");
-        dic.add(9,"serviceId");
-        dic.add(10,"categoryName");
-        dic.add(11,"displayName");
-        dic.add(12,"offeringVersion");
-        dic.add(13,"catalogId");
-        dic.add(14,"serviceName");
-        dic.add(15,"subscriptionName");
-        dic.add(16,"subscriptionDescription");
-        dic.add(17,"startDate");
-        dic.add(18,"ORDER");
-        dic.add(19,"AlaMaKOta123");
-    }
-    
+    } 
     
     void raiseError(String errorMessage) throws Exception {
         throw new RuntimeException(errorMessage);
@@ -350,7 +294,7 @@ public class Subscription {
     }
     
     
-    void addMetaFields(int seq,JsonObject offering) throws Exception {
+    void addMetaFields(int seq,JsonNode offering) throws Exception {
         getMetaFields(offering); 
         Set<String> keys = meta.keySet();
         int row = 0;
@@ -372,93 +316,125 @@ public class Subscription {
         return input.get(name);
     }
     
-    void addRequestFields(int seq, JsonObject order) throws Exception {
+    void _addRequestFields(int seq, JsonNode order) throws Exception {
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
         wexcel.setColumnSize(seq, 1, 0);
         wexcel.setColumnSize(seq, 2, 0);
         wexcel.setColumnSize(seq, 3, 0);        
-        wexcel.addHeader(seq, 0, 0, dic.get(5));
-        wexcel.addHeader(seq, 1, 0, dic.get(6));
-        wexcel.addHeader(seq, 2, 0, dic.get(7));
-        wexcel.addHeader(seq, 3, 0, dic.get(8));
-        JsonArray fields = order.getJsonArray("fields");
-        Iterator<JsonValue> fi = fields.iterator();
+        wexcel.addHeader(seq, 0, 0, "Field Identifier");
+        wexcel.addHeader(seq, 1, 0, "Field Name");
+        wexcel.addHeader(seq, 2, 0, "Display Name");
+        wexcel.addHeader(seq, 3, 0, "Field Value");
+        Iterator<JsonNode> fields = order.get("fields").elements();
         // Data start from row 1
         int r = 1;
-        while (fi.hasNext()) {
-            JsonValue jv = fi.next();
-            JsonObject fld = jv.asJsonObject();
-            String id = fld.getString("id");
+        while (fields.hasNext()) {
+            JsonNode field = fields.next();
+
+            String id = field.get("id").asText();
             wexcel.addContent(seq, 0, r, id);
-            String name = fld.getString("name");
+            String name = field.get("name").asText();
             wexcel.addContent(seq, 1, r, name);
-            String descriptiveName = fld.getString("displayName");
-            wexcel.addContent(seq, 2, r, descriptiveName);
-            JsonValue vl = fld.get("value");
+            String displayName = field.get("displayName").asText();
+            wexcel.addContent(seq, 2, r, displayName);
             String value = "";
-            if (vl.getValueType() == JsonValue.ValueType.STRING) 
-                value = String.format("\"%s\"", ((JsonString) vl).getString());
-            else if (vl.getValueType() == JsonValue.ValueType.NUMBER)
-                value = String.format("%s", ((JsonNumber) vl).toString());
-            else if (vl.getValueType() == JsonValue.ValueType.TRUE)
-                value = "true";
-            else if (vl.getValueType() == JsonValue.ValueType.FALSE)
-                value = "false";
-            else if (vl.getValueType() == JsonValue.ValueType.NULL)
-                value = ""; 
+            if ( field.get("value") != null ) {
+                if (field.get("value").getNodeType() == JsonNodeType.STRING) 
+                    value = String.format("\"%s\"", field.get("value").asText());
+                else if (field.get("value").getNodeType() == JsonNodeType.NUMBER)
+                    value = String.format("%d", field.get("value").asInt());
+                else if (field.get("value").getNodeType() == JsonNodeType.BOOLEAN)
+                    value = Boolean.toString(field.get("value").asBoolean());
+                else 
+                    value = ""; 
+            }
+            else 
+                value = "";
             wexcel.addContent(seq, 3, r, value);
             r++;
         };
     }
     
-    void getMetaFields(JsonObject offering) {
-        meta = new HashMap<>();
-        meta.put(dic.get(9), offering.getString("id"));
-        meta.put(dic.get(10), offering.getJsonObject("category").getString("name"));
-        meta.put(dic.get(12), offering.getString("offeringVersion"));
-        meta.put(dic.get(13), offering.getString("catalogId"));
-        meta.put(dic.get(14), offering.getString("name"));
-        meta.put(dic.get(15), "");
-        meta.put(dic.get(16), "");
-        meta.put(dic.get(17), "");
+    void addRequestFields(int seq, JsonNode order) throws Exception {
+        // Add header
+        wexcel.setColumnSize(seq, 0, 0);
+        wexcel.setColumnSize(seq, 1, 0);
+        wexcel.setColumnSize(seq, 2, 0);
+        wexcel.setColumnSize(seq, 3, 0);        
+        wexcel.addHeader(seq, 0, 0, "Field Identifier");
+        wexcel.addHeader(seq, 1, 0, "Field Name");
+        wexcel.addHeader(seq, 2, 0, "Display Name");
+        wexcel.addHeader(seq, 3, 0, "Field Value");
+        Iterator<JsonNode> fields = order.get("fields").elements();
+        // Data start from row 1
+        int r = 1;
+        while (fields.hasNext()) {
+            JsonNode field = fields.next();
+
+            String id = field.get("id").asText();
+            wexcel.addContent(seq, 0, r, id);
+            String name = field.get("name").asText();
+            wexcel.addContent(seq, 1, r, name);
+            String displayName = field.get("displayName").asText();
+            wexcel.addContent(seq, 2, r, displayName);
+            String value = "";
+            if ( field.get("value") != null ) {
+                if (field.get("value").getNodeType() == JsonNodeType.STRING)
+                    wexcel.addString(seq, 3, r, field.get("value").asText(), WriteExcel.CellFormats.DataNoWrap);
+                else if (field.get("value").getNodeType() == JsonNodeType.NUMBER)
+                    wexcel.addNumber(seq, 3, r, field.get("value").asInt(), WriteExcel.CellFormats.DataNoWrap);
+                else if (field.get("value").getNodeType() == JsonNodeType.BOOLEAN)
+                    wexcel.addBoolean(seq, 3, r, field.get("value").asBoolean(), WriteExcel.CellFormats.DataNoWrap);
+            }
+            else 
+                wexcel.addString(seq, 3, r, "", WriteExcel.CellFormats.DataNoWrap);
+            r++;
+        };
     }
     
-    void addOfferingFields(int seq, JsonObject offering) throws Exception {                   
+    void getMetaFields(JsonNode offering) {
+        meta = new HashMap<>();
+        meta.put("serviceId", offering.get("id").asText());
+        meta.put("categoryName", offering.get("category").get("name").asText());
+        meta.put("offeringVersion", offering.get("offeringVersion").asText());
+        meta.put("catalogId", offering.get("catalogId").asText());
+        meta.put("serviceName", offering.get("name").asText());
+        meta.put("subscriptionName", "");
+        meta.put("subscriptionDescription", "");
+        meta.put("startDate", "");
+    }
+    
+    void addOfferingFields(int seq, JsonNode offering) throws Exception {                   
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
         wexcel.setColumnSize(seq, 1, 0);
         wexcel.setColumnSize(seq, 2, 0);
         wexcel.setColumnSize(seq, 3, 0);  
-        wexcel.addHeader(seq, 0, 0, dic.get(5));
-        wexcel.addHeader(seq, 1, 0, dic.get(6));
-        wexcel.addHeader(seq, 2, 0, dic.get(7));
-        wexcel.addHeader(seq, 3, 0, dic.get(8));
-        JsonArray fields = offering.getJsonArray("fields");
-        Iterator<JsonValue> fi = fields.iterator();
+        wexcel.addHeader(seq, 0, 0, "Field Identifier");
+        wexcel.addHeader(seq, 1, 0, "Field Name");
+        wexcel.addHeader(seq, 2, 0, "Display Name");
+        wexcel.addHeader(seq, 3, 0, "Field Value");
+        Iterator<JsonNode> fields = offering.get("fields").elements();
         // Data start from row 1
         int r = 1;
-        while (fi.hasNext()) {
-            JsonValue jv = fi.next();
-            JsonObject fld = jv.asJsonObject();
-            String id = fld.getString("id");
+        while (fields.hasNext()) {
+            JsonNode field = fields.next();
+            String id = field.get("id").asText();
             wexcel.addContent(seq, 0, r, id);
-            String name = fld.getString("name");
+            String name = field.get("name").asText();
             wexcel.addContent(seq, 1, r, name);
-            String descriptiveName = fld.getString("displayName");
-            wexcel.addContent(seq, 2, r, descriptiveName);
-            JsonValue vl = fld.get("value");
+            String displayName = field.get("displayName").asText();
+            wexcel.addContent(seq, 2, r, displayName);
             String value = "";
-            if ( vl != null ) {
-                if (vl.getValueType() == JsonValue.ValueType.STRING) 
-                    value = String.format("\"%s\"", ((JsonString) vl).getString());
-                else if (vl.getValueType() == JsonValue.ValueType.NUMBER)
-                    value = String.format("%s", ((JsonNumber) vl).toString());
-                else if (vl.getValueType() == JsonValue.ValueType.TRUE)
-                    value = "true";
-                else if (vl.getValueType() == JsonValue.ValueType.FALSE)
-                    value = "false";
-                else if (vl.getValueType() == JsonValue.ValueType.NULL)
+            if ( field.get("value") != null ) {
+                if (field.get("value").getNodeType() == JsonNodeType.STRING) 
+                    value = String.format("\"%s\"", field.get("value").asText());
+                else if (field.get("value").getNodeType() == JsonNodeType.NUMBER)
+                    value = String.format("%d", field.get("value").asInt());
+                else if (field.get("value").getNodeType() == JsonNodeType.BOOLEAN)
+                    value = Boolean.toString(field.get("value").asBoolean());
+                else 
                     value = ""; 
             }
             else 
@@ -469,43 +445,41 @@ public class Subscription {
         };
     }
     
-    void addTemplateFieldsToSheet(int seq, JsonObject order) throws Exception {
+    void addTemplateFieldsToSheet(int seq, JsonNode order) throws Exception {
         
         // Add header
         wexcel.setColumnSize(seq, 0, 0);
         wexcel.setColumnSize(seq, 1, 0);
         wexcel.setColumnSize(seq, 2, 0);
         wexcel.setColumnSize(seq, 3, 0);  
-        wexcel.addHeader(seq, 0, 0, dic.get(5));
-        wexcel.addHeader(seq, 1, 0, dic.get(6));
-        wexcel.addHeader(seq, 2, 0, dic.get(7));
-        wexcel.addHeader(seq, 3, 0, dic.get(8));
-        JsonArray fields = order.getJsonArray("fields");
-        Iterator<JsonValue> fi = fields.iterator();
+        wexcel.addHeader(seq, 0, 0, "Field Identifier");
+        wexcel.addHeader(seq, 1, 0, "Field Name");
+        wexcel.addHeader(seq, 2, 0, "Display Name");
+        wexcel.addHeader(seq, 3, 0, "Field Value");
+        Iterator<JsonNode> fields =  order.get("fields").elements();
         // Data start from row 1
         int r = 1;
-        while (fi.hasNext()) {
-            JsonValue jv = fi.next();
-            JsonObject fld = jv.asJsonObject();
-            
-            String name = fld.getString("name");
+        while (fields.hasNext()) {
+            JsonNode field = fields.next();          
+            String name = field.get("name").asText();
             wexcel.addContent(seq, 1, r, name);
             String id = input.get(name);
             wexcel.addContent(seq, 0, r, id);
-            String descriptiveName = fld.getString("displayName");
-            wexcel.addContent(seq, 2, r, descriptiveName);
-            JsonValue vl = fld.get("value");
+            String displayName = field.get("displayName").asText();
+            wexcel.addContent(seq, 2, r, displayName);
             String value = "";
-            if (vl.getValueType() == JsonValue.ValueType.STRING) 
-                value = String.format("\"%s\"", ((JsonString) vl).getString());
-            else if (vl.getValueType() == JsonValue.ValueType.NUMBER)
-                value = String.format("%s", ((JsonNumber) vl).toString());
-            else if (vl.getValueType() == JsonValue.ValueType.TRUE)
-                value = "true";
-            else if (vl.getValueType() == JsonValue.ValueType.FALSE)
-                value = "false";
-            else if (vl.getValueType() == JsonValue.ValueType.NULL)
-                value = ""; 
+            if ( field.get("value") != null ) {
+                if (field.get("value").getNodeType() == JsonNodeType.STRING) 
+                    value = String.format("\"%s\"", field.get("value").asText());
+                else if (field.get("value").getNodeType() == JsonNodeType.NUMBER)
+                    value = String.format("%d", field.get("value").asInt());
+                else if (field.get("value").getNodeType() == JsonNodeType.BOOLEAN)
+                    value = Boolean.toString(field.get("value").asBoolean());
+                else 
+                    value = ""; 
+            }
+            else 
+                value = "";
             wexcel.addContent(seq, 3, r, value);
             r++;
         }
@@ -544,7 +518,7 @@ public class Subscription {
             String out = getWorkbookName();
             rexcel = new ReadExcel(out);
         }
-        rexcel.setSheet(dic.get(4), 0);
+        rexcel.setSheet("New Order Template", 0);
         String[] ids = rexcel.readColumn(0);
         String[] values = rexcel.readColumn(3);
         for ( int i = 0; i < ids.length; i++ ) {
@@ -556,6 +530,42 @@ public class Subscription {
         sb.append("}\n")
                 .append("}\n\n")
                 .append("--"+BOUNDARY+"--");        
+        return sb.toString();
+    }
+    
+    String buildOrderPayload() throws Exception {   
+        // Format JSON Body
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("--"+BOUNDARY+"\n");
+        sb.append("Content-Disposition: form-data; name=\"requestForm\"\n");
+        sb.append("Content-Type: text/json\n\n");
+       
+        Map<String,Object> content = new HashMap<>();
+        content.put("action","ORDER");
+        content.put("categoryName", meta.get("categoryName"));
+        content.put("subscriptionName", meta.get("subscriptionName"));
+        content.put("subscriptionDescription",meta.get("subscriptionDescription"));
+        content.put("startDate", meta.get("startDate"));
+        
+        Map<String,String> fields = new HashMap<>();
+        // Read fields from workbook
+        if (rexcel == null) {
+            String out = getWorkbookName();
+            rexcel = new ReadExcel(out);
+        }
+        rexcel.setSheet("New Order Template", 0);
+        String[] ids = rexcel.readColumn(0);
+        String[] values = rexcel.readColumn(3);
+        for ( int i = 0; i < ids.length; i++ ) {
+            fields.put(ids[i], values[i]);
+        }      
+        content.put("fields", fields);
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        String cs = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(content);
+        
+        sb.append(cs).append("\n\n").append("--"+BOUNDARY+"--");        
         return sb.toString();
     }
     
@@ -608,7 +618,10 @@ public class Subscription {
         System.out.println(uri);
         String cnt = "application/json";
         String output = net.postHttp(null, transportUser, transportPassword, uri, fields, cnt, cnt);
-        System.out.println(output);
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        HashMap<String,Object> av = (HashMap<String,Object>) mapper.readValue(output, HashMap.class);
+        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(av));
     }
     
     String getUserId() throws Exception {
@@ -619,7 +632,8 @@ public class Subscription {
         String output = net.getHttp(null, transportUser, transportPassword, uri, ac);
         int delta = stoper();
         System.out.format(" Duration(ms) %d%n",delta);
-        return stringToJson(output).getString("id");
+        ObjectMapper mapper = new ObjectMapper();        
+        return mapper.readTree(output).get("id").asText();
     }
     
     String requestToken() throws Exception {
@@ -631,39 +645,4 @@ public class Subscription {
         return net.getToken();
     }
             
-    
-    String jsonToString(JsonObject jo) {
-        StringWriter writer = new StringWriter();
-        JsonWriter jwriter = Json.createWriter(writer);
-        jwriter.writeObject(jo);
-        return writer.toString();       
-    }
-    
-    JsonObject stringToJson(String txt) {
-        StringReader reader = new StringReader(txt);
-        JsonReader jreader = Json.createReader(reader);
-        return jreader.readObject();
-    } 
-            
-    JsonObject readJsonObjectFromFile(String fileName) throws Exception {
-        String content = new String(Files.readAllBytes(Paths.get(fileName)));
-        StringReader reader = new StringReader(content);
-        JsonReader jreader = Json.createReader(reader);
-        JsonObject job = jreader.readObject();
-        return job;
-    }
-    
-    JsonArray readJsonArrayFromFile(String fileName) throws Exception {
-        String content = new String(Files.readAllBytes(Paths.get(fileName)));
-        StringReader reader = new StringReader(content);
-        JsonReader jreader = Json.createReader(reader);
-        JsonArray jar = jreader.readArray();
-        return jar;
-    }
-    
-    String getField(String s,String f) {
-        JsonObject sub = stringToJson(s);
-        return sub.getString(f);
-    }
-  
 }
