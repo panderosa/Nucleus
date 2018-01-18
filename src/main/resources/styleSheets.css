@@ -1,0 +1,18 @@
+.hbox {
+    -fx-background-color: #336699;
+}
+.vbox {
+    -fx-border-color:black;
+    -fx-border-width:1;
+}
+
+.grid {
+    -fx-border-color:black;
+    -fx-border-width:1;    
+}
+
+.title {
+    -fx-font-family: verdana;
+    -fx-font-size: 20;
+}
+

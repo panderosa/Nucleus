@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 
@@ -50,6 +51,7 @@ public class Subscription {
     private JsonNode subscription;
     private long start;
     private Map<String,String> input;
+    private List<String> actions;
     
     public static void main(String[] args) throws Exception {
         Subscription ps = new Subscription(args);
@@ -92,8 +94,13 @@ public class Subscription {
     }    
     
     public Subscription() {
+       
         input = new HashMap<>();
     }  
+    
+    public List<String> getActionList() {
+        return actions;
+    }
     
     void parseArguments(String[] args) throws Exception {
         arguments = new HashMap<>();
@@ -169,6 +176,18 @@ public class Subscription {
             out = mapper.readTree(viewOffering());
         }
         return out;
+    }
+    
+    public String readFile(File file) {
+        String out = null;
+        try {
+            ObjectMapper mapper = new ObjectMapper();   
+            mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+            JsonNode root = mapper.readTree(file);
+            out = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);        
+        }
+        catch (Exception e) {out = e.getMessage();};
+        return out;    
     }
     
     public String getDefaultConfiguration(File file) throws Exception {
@@ -831,6 +850,23 @@ public class Subscription {
         String output = net.getHttp(token, null, null, uri, acceptContent);
         int delta = stoper();
         System.out.format(" Duration(ms) %d%n",delta);
+        return output;
+    }
+    
+    public String updateProcessInstance() throws Exception {
+        String id = arguments.get("id");
+        if (id == null) raiseError("Process Instance \"id\" is null");
+        String state = arguments.get("state");
+        if (state == null) raiseError("Process Instance \"state\" is null. E.g. use COMPLETED.");
+        String returnCode = arguments.get("returnCode");
+        if (returnCode == null) raiseError("Process Instance \"returnCode\" is null. E.g. use [FAILURE|SUCCESS]");
+        String status = arguments.get("status");
+        if (status == null) raiseError("Process Instance \"status\" is null");
+        initCSA();
+        String userId = getUserId();
+        String uri = "/csa/rest/processinstances/" + id + "?userIdentifier=" + userId + "&scope=view&view=processinstancestate&action=merge";	
+        String payload = "<ProcessInstance><id>"+id+"</id><processInstanceState><name>"+state+"</name></processInstanceState><processReturnCode><name>"+returnCode+"</name></processReturnCode><status>"+status+"</status></ProcessInstance>";
+        String output = net.putHttp(null, csaAdmin, csaAdminPassword, uri, payload, "application/xml", "application/xml");
         return output;
     }
     
