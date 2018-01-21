@@ -1,6 +1,7 @@
 package nucleus.dm;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.impl.auth.BasicScheme;
@@ -22,10 +23,11 @@ import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.HttpEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
-import javax.json.*;
 import java.io.StringReader;
 import javax.net.ssl.SSLContext;
 import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
@@ -43,7 +45,7 @@ public class Net {
     private final HttpHost targetHost;
     private final String protocol;
     private CloseableHttpClient httpClient = null;
-    private String token;
+    private String token = null;
     
     public static void main(String[] args) throws Exception {
     
@@ -107,13 +109,22 @@ public class Net {
         httpPost.addHeader("Accept", "application/json");
         httpPost.addHeader("Content-Type", "application/json");
         String dconsumerPassword = decryptPassword(consumerPassword);
-        JsonObject jbody = Json.createObjectBuilder()
+        
+        /*JsonObject jbody = Json.createObjectBuilder()
                 .add("tenantName", tenant)
                 .add("passwordCredentials",Json.createObjectBuilder()
-                        .add("username", consumer)
+                        .add("username", username)
                         .add("password", dconsumerPassword))
                         .build();
-        String body = jbody.toString();
+        String body = jbody.toString();*/
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String,Object> payload = new HashMap<>();
+        Map<String,String> passwordCredentials = new HashMap<>();
+        payload.put("tenantName", tenant);
+        passwordCredentials.put("username", consumer);
+        passwordCredentials.put("password", dconsumerPassword);
+        payload.put("passwordCredentials", passwordCredentials);
+        String body = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);      
         HttpEntity bodyEntity = new StringEntity(body);
         httpPost.setEntity(bodyEntity);
         CloseableHttpResponse response = httpClient.execute(targetHost, httpPost, context);
@@ -129,15 +140,7 @@ public class Net {
     public String getRawToken() {
         return this.token;
     }
-    
-    public String getToken() {
-        StringReader reader = new StringReader(token);
-        JsonReader jreader = Json.createReader(reader);
-        JsonObject jobj = jreader.readObject();
-        return jobj.getJsonObject("token").getString("id");
-    }
-    
-    
+        
     public String getHttp(String tkn, String userName, String password, String uri, String acceptContent) throws Exception {
         CloseableHttpResponse response;
         HttpGet httpGet = new HttpGet(uri);

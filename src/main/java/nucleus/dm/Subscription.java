@@ -11,8 +11,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -47,15 +49,16 @@ public class Subscription {
     private String csaAdminOrg;
     private String csaTenant;
     private String onBehalf;
-    private Net net;
+    private Net net = null;
     private JsonNode subscription;
     private long start;
     private Map<String,String> input;
-    private List<String> actions;
+    private List<Action> actions;
+    private Map<String,Conf> config;
     
     public static void main(String[] args) throws Exception {
         Subscription ps = new Subscription(args);
-        switch (ps.getOption()) {
+        switch (ps.getActionName()) {
             case "order":
                 ps.orderSubscription();
                 break;
@@ -68,8 +71,8 @@ public class Subscription {
             case "availableValues":
                 ps.availableValues();
                 break;
-            case "getSubscription":
-                ps.getSubscriptionDetails();
+            case "viewSubscriptionDetails":
+                ps.viewSubscriptionDetails();
                 break;
             case "getRequest":
                 ps.getRequestDetails();
@@ -93,13 +96,156 @@ public class Subscription {
         input = new HashMap<>();
     }    
     
-    public Subscription() {
-       
+    public Subscription() {   
+        initializeActionsList();
         input = new HashMap<>();
     }  
     
-    public List<String> getActionList() {
+    public List<Action> getActions() {
         return actions;
+    }
+    
+    private void initializeActionsList() {       
+        Action a1 = new Action("orderSubscription","Order Subscription");
+        a1.addParameter("template", "XLS template with order request");
+        
+        Action a2 = new Action("viewSubscriptionDetails","View Subscription Details");
+        a2.addParameter("subscriptionId", "Subscription Id");
+        a2.addParameter("apiName", "CSA API, use mpp|service");
+        
+        Action a3 = new Action("getAvailableValues","Get Available Values");
+        a3.addParameter("fieldId", "Field Id (without prefix)");
+        a3.addParameter("inputFieldId", "Input Field Name");
+        a3.addParameter("inputFieldValue", "Input Field Value");
+        
+        Action a4 = new Action("viewRequestDetails","View Request Details");
+        a4.addParameter("requestId", "Request Id");
+        
+        Action a5 = new Action("viewSubscriptionErrorInfo","View Subscription Error Info");
+        a5.addParameter("subscriptionId", "Subscription Id");
+        
+        Action a6 = new Action("viewServiceComponentsProperties","View Service Components Properties");
+        a6.addParameter("subscriptionId", "Subscription Id");
+        
+        Action a7 = new Action("updateComponentProperty","Update Components Property Value");
+        a7.addParameter("componentId", "Service Component Id");
+        a7.addParameter("propertyName", "Property Name");
+        a7.addParameter("propertyDisplayName", "Property Display Name");
+        a7.addParameter("propertyValueType", "Property Value Type");
+        a7.addParameter("propertyVisibility", "Property Visibility, use true|false");
+        a7.addParameter("propertyValue", "Property Value");
+        
+        Action a8 = new Action("updateProcessInstance","Update Process Instance");
+        a8.addParameter("csaProcessId", "CSA Process Id");
+        a8.addParameter("processState", "State, e.g. COMPLETED...");
+        a8.addParameter("processReturnCode", "Return Code, e.g. SUCCESS, FAILURE");
+        a8.addParameter("processStatus", "Status Information");
+        
+        actions = Arrays.asList(a1,a2,a3,a4,a5,a6,a7,a8);   
+    }
+      
+    public String wrapperMethodForGui(String[] args) {
+        String out;
+        try {
+            parseArguments(args);
+            initCSAClient();
+            String action = getActionName();
+            switch (action) {
+                case "orderSubscription":
+                    out = "orderSubscription";
+                    break;
+                 case "viewSubscriptionDetails":
+                    out = viewSubscriptionDetails();
+                    break;
+                 case "getAvailableValues":
+                    out = "getAvailableValues";
+                    break;
+                 case "viewRequestDetails":
+                    out = "viewRequestDetails";
+                    break;
+                 case "viewSubscriptionErrorInfo":
+                    out = "viewSubscriptionErrorInfo";
+                    break;
+                 case "viewServiceComponentsProperties":
+                    out = "viewServiceComponentsProperties";
+                    break;
+                 case "updateComponentProperty":
+                    out = "updateComponentProperty";
+                    break;
+                 case "updateProcessInstance":
+                    out = "updateProcessInstance";
+                    break;    
+                default:
+                    out = "No method selected";
+            }
+        }
+        catch(Exception e) {
+            out = processException(e);
+        }
+        return out;
+    }
+    
+    public String readConfiguration(File file) {
+        String out = null;
+        try {
+            ObjectMapper mapper = new ObjectMapper();   
+            mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+            JsonNode root = mapper.readTree(file);
+            setUpConfiguration(root);
+            out = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);        
+        }
+        catch (Exception e) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
+            PrintWriter pw = new PrintWriter(baos,true);
+            e.printStackTrace(pw);
+            out = baos.toString();
+        }
+        return out;    
+    }
+    
+    private void setUpConfiguration(JsonNode root) throws Exception {  
+        config = new HashMap<>();
+        idmUser = root.get("idmUser").get("name").asText();
+        config.put("idmUser", new Conf("IDM Transport User",idmUser,"STRING","plain"));
+        idmPassword = root.get("idmUser").get("password").asText();
+        config.put("idmPassword", new Conf("IDM Transport Password",idmPassword,"STRING","hidden"));
+        transportUser = root.get("transportUser").get("name").asText();
+        config.put("transportUser", new Conf("CSA Transport User",transportUser,"STRING","plain"));
+        transportPassword = root.get("transportUser").get("password").asText();
+        config.put("transportPassword", new Conf("CSA Transport Password",transportPassword,"STRING","hidden"));
+        csaConsumer = root.get("defaultConsumer").asText();
+        config.put("csaConsumer", new Conf("Consumer User",csaConsumer,"STRING","plain"));
+        csaConsumerPassword = root.get(csaConsumer).asText();
+        config.put("csaConsumerPassword", new Conf("Consumer Password",csaConsumerPassword,"STRING","hidden"));
+        csaTenant = root.get("defaultTenant").asText();
+        config.put("csaTenant", new Conf("Consumer Tenant",csaTenant,"STRING","plain"));
+        onBehalf = root.get("onBehalf").asText();
+        config.put("onBehalf", new Conf("Manage On Behalf User",onBehalf,"STRING","plain"));
+        csaAdmin = root.get("defaultPrivilegedUser").asText();
+        config.put("csaAdmin", new Conf("CSA Privileged User",csaAdmin,"STRING","plain"));
+        csaAdminPassword = root.get(csaAdmin).asText();
+        config.put("csaAdminPassword", new Conf("Priviliged Password",csaAdminPassword,"STRING","hidden"));
+        csaAdminOrg = root.get("defaultAdminOrganization").asText();
+        config.put("csaAdminOrg", new Conf("Provider Organization",csaAdminOrg,"STRING","plain"));       
+        csaServer = root.get("csaAS").get("Server").asText();
+        config.put("csaServer", new Conf("CSA Server",csaServer,"STRING","plain"));     
+        csaPort = root.get("csaAS").get("Port").asInt();
+        config.put("csaPort", new Conf("TCP Port",Integer.toString(csaPort),"INT","plain"));  
+        csaProtocol = root.get("csaAS").get("Protocol").asText();
+        config.put("csaProtocol", new Conf("Transport Protocol",csaProtocol,"STRING","plain")); 
+    } 
+    
+    Map<String,Conf> getConfiguration() {
+        return config;
+    }
+    
+    void setConfiguration(Map<String,Conf> config) {
+        this.config = config;
+    }
+    
+    void initCSAClient() throws Exception {
+        if (net == null)
+            net = new Net(csaServer,csaPort,csaProtocol);
     }
     
     void parseArguments(String[] args) throws Exception {
@@ -178,17 +324,7 @@ public class Subscription {
         return out;
     }
     
-    public String readFile(File file) {
-        String out = null;
-        try {
-            ObjectMapper mapper = new ObjectMapper();   
-            mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-            JsonNode root = mapper.readTree(file);
-            out = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);        
-        }
-        catch (Exception e) {out = e.getMessage();};
-        return out;    
-    }
+    
     
     public String getDefaultConfiguration(File file) throws Exception {
             ObjectMapper mapper = new ObjectMapper();        
@@ -229,8 +365,7 @@ public class Subscription {
         csaPort = ((Integer) ((HashMap<String,Object>) cnf.get("csaAS")).get("Port")).intValue();
         csaProtocol = (String) ((HashMap<String,Object>) cnf.get("csaAS")).get("Protocol");
         this.onBehalf = onBehalf;
-    }
-    
+    } 
     
     
     void initCSA() throws Exception {
@@ -244,7 +379,7 @@ public class Subscription {
         setCSAParams(env, host, consumer, tenant, onBehalf);
         System.out.print("Initializing connection to CSA.");
         stoper();
-        net = new Net(this.csaServer,this.csaPort,this.csaProtocol);  
+        net = new Net(csaServer,csaPort,csaProtocol);  
         int delta = stoper();
         System.out.format(" Duration(ms) %d%n",delta);
     }
@@ -253,16 +388,8 @@ public class Subscription {
         String uuid = arguments.get("uuid");
         if (uuid == null) raiseError("Argument subscription \"uuid\" is null");
         if (net == null) initCSA();
-        if (net.getRawToken() == null) {
-            System.out.print("Retrieving token from CSA.");
-            stoper();
-            //System.out.println(idmUser+"|"+idmPassword+"|"+csaConsumer+"|"+csaConsumerPassword+"|"+csaTenant);
-            net.requestToken(idmUser, idmPassword, csaConsumer, csaConsumerPassword, csaTenant);
-            int delta = stoper();
-            System.out.format(" Duration(ms) %d%n",delta);
-        }       
+        String token = requestToken();
         String uri = "/csa/api/mpp/mpp-subscription/" + uuid;
-        String token = net.getToken();
         System.out.print("Retrieving subscription details from CSA.");
         stoper();
         String out = net.getHttp(token, null, null, uri, "application/json");
@@ -281,10 +408,9 @@ public class Subscription {
     
     String getRequestDetails(String id) throws Exception {
         if (net == null) initCSA();
-        if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);   
+        String token = requestToken();   
         String uri = "/csa/api/mpp/mpp-request/" + id;
-        uri = (onBehalf != null)? uri + "?onBehalf=" + onBehalf: uri;
-        String token = net.getToken();
+        uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
         System.out.print("Retrieving request details from CSA.");
         stoper();
         String out = net.getHttp(token, null, null, uri, "application/json");
@@ -301,7 +427,7 @@ public class Subscription {
         String categoryName = subscription.get("category").get("name").asText();
         String uri = String.format("/csa/api/mpp/mpp-offering/%s?catalogId=%s&category=%s",serviceId,catalogId,categoryName);
         uri = (onBehalf != null)? uri + "&onBehalf=" + onBehalf: uri;
-        String token = net.getToken();
+        String token = requestToken();
         System.out.print("Retrieving service offering details from CSA.");
         stoper();
         String out = net.getHttp(token, null, null, uri, "application/json");
@@ -328,8 +454,8 @@ public class Subscription {
     }
     
     
-    String getOption() throws Exception {
-        String opt = (arguments.get("option") != null)? arguments.get("option"): "default";
+    String getActionName() throws Exception {
+        String opt = (arguments.get("action") != null)? arguments.get("action"): "default";
         return opt;
     }
     
@@ -663,7 +789,7 @@ public class Subscription {
     public void getErrorForSubscription() throws Exception {
         String id = arguments.get("id");
         if (id == null) raiseError("Subscription \"id\" is null");
-        String sub = getSubscriptionDetails(id,"service");
+        String sub = viewSubscriptionDetails(id,"service");
         ObjectMapper mapper = new ObjectMapper();
         String sid = mapper.readTree(sub).get("ext").get("csa_service_instance_id").asText();
         String service = getServiceDetails(sid);
@@ -756,28 +882,30 @@ public class Subscription {
         }
     }
     
-    public void getSubscriptionDetails() throws Exception {
-        String id = arguments.get("id");
+    public String viewSubscriptionDetails() throws Exception {
+        String id = arguments.get("subscriptionId");
         if (id == null) raiseError("Subscription \"id\" is null");
-        String api = arguments.get("api");
-        String output = getSubscriptionDetails(id,api);
-        System.out.println(output);
+        String api = arguments.get("apiName");
+        
+        //initCSAClient();
+        String output = viewSubscriptionDetails(id,api);
+        return output;
     }
     
-    String getSubscriptionDetails(String id, String api) throws Exception {
-        
+    String viewSubscriptionDetails(String id, String api) throws Exception {       
         String uri;
         String output = null;
         String acceptContent = "application/json";
-        initCSA();
+        //initCSA();
         if (api.equalsIgnoreCase("service")) {
             uri = "/csa/api/service/subscription/" + id;
             String ac = "application/json";
-            output = net.getHttp(null, csaAdmin, csaAdminPassword, uri, acceptContent);
+            output = net.getHttp(null, config.get("csaAdmin").getValue(), config.get("csaAdminPassword").getValue(), uri, acceptContent);
         }
         else {
             uri = "/csa/api/mpp/mpp-subscription/" + id;
-            uri = (onBehalf != null)? uri + "?onBehalf=" + onBehalf: uri;
+            String onBehalf = config.get("onBehalf").getValue();
+            uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
             String token = requestToken();
             output = net.getHttp(token, null, null, uri, acceptContent);
         }
@@ -812,7 +940,7 @@ public class Subscription {
     public String getServiceComponentsProperties() throws Exception {
         String id = arguments.get("id");
         if (id == null) raiseError("Subscription \"id\" is null");
-        String sub = getSubscriptionDetails(id,"service");
+        String sub = viewSubscriptionDetails(id,"service");
         ObjectMapper mapper = new ObjectMapper();
         String sid = mapper.readTree(sub).get("ext").get("csa_service_instance_id").asText();
         String service = getServiceDetails(sid);
@@ -831,7 +959,7 @@ public class Subscription {
     public String getServiceDetails() throws Exception {
         String id = arguments.get("id");
         if (id == null) raiseError("Subscription \"id\" is null");
-        String sub = getSubscriptionDetails(id,"service");
+        String sub = viewSubscriptionDetails(id,"service");
         ObjectMapper mapper = new ObjectMapper();
         String sid = mapper.readTree(sub).get("ext").get("csa_service_instance_id").asText();
         String out = getServiceDetails(sid);
@@ -843,7 +971,6 @@ public class Subscription {
         String uri = "/csa/api/mpp/mpp-instance/" + id;
         uri = (onBehalf != null)? uri + "?onBehalf=" + onBehalf: uri;
         if (net == null) initCSA();
-        if (net.getRawToken() == null) net.requestToken(this.idmUser, this.idmPassword, this.csaConsumer, this.csaConsumerPassword, this.csaTenant);
         String token = requestToken();
         System.out.print("Retrieving Service Details.");
         stoper();
@@ -883,12 +1010,25 @@ public class Subscription {
     }
     
     String requestToken() throws Exception {
-        System.out.print("Requesting CSA Token.");
-        stoper();
-        net.requestToken(idmUser, idmPassword, csaConsumer, csaConsumerPassword, csaTenant);
-        int delta = stoper();
-        System.out.format(" Duration(ms) %d%n",delta);
-        return net.getToken();
+        String rtoken = net.getRawToken();
+        if (rtoken == null) {
+            System.out.print("Requesting CSA Token...");
+            stoper();
+            net.requestToken(idmUser, idmPassword, csaConsumer, csaConsumerPassword, csaTenant);
+            int delta = stoper();
+            System.out.format(" Duration(ms) %d%n",delta);
+            rtoken = net.getRawToken();
+        }
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readTree(rtoken).get("token").get("id").asText();
+    }
+    
+    private String processException(Throwable e) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
+        PrintWriter pw = new PrintWriter(baos,true);
+        e.printStackTrace(pw);
+        String out = baos.toString();
+        return out;
     }
             
 }

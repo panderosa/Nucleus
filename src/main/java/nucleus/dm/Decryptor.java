@@ -1,5 +1,7 @@
 package nucleus.dm;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
@@ -12,12 +14,9 @@ import java.security.SecureRandom;
 import java.nio.file.Paths;
 import java.security.Key;
 import java.util.Arrays;
+import java.util.List;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
 import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
 import org.jasypt.encryption.pbe.config.SimpleStringPBEConfig;
 import org.jasypt.properties.PropertyValueEncryptionUtils;
@@ -44,45 +43,9 @@ public class Decryptor {
         PASSWORD = myPassword;
     }
     
-    public Decryptor(JsonArray rk) throws Exception {
-        RKBA = jsonToByteArray(rk);
-    }
-    
     public static void main(String[] args) throws Exception {
-        Decryptor Dec;
-        switch (args[0]) {
-            case "cenc":
-                Dec = new Decryptor();
-                System.out.println(Dec.encryptCSAPassword(args[1]));
-                break;
-            case "cdec":
-                Dec = new Decryptor();
-                System.out.println(Dec.decryptCSAPassword(args[1]));
-                break;
-            case "enc": 
-                Dec = new Decryptor();
-                System.out.println(Dec.encryptPassword(args[1]));
-                break;
-            case "dec": 
-                Dec = new Decryptor();
-                System.out.println(Dec.decryptPassword(args[1]));
-                break;
-            case "decoo":
-                Dec = new Decryptor();
-                byte[] cfg = Dec.readRKToByteArray(args[1]);
-                System.out.println(Dec.decryptOOPassword(cfg, args[2]));
-                break;
-            default:
-                System.out.println("Bad option");
-        }
     }
-    
-    private JsonObject readConfiguration(String fileName) throws IOException {
-        String content = new String(Files.readAllBytes(Paths.get(fileName)));
-        StringReader reader = new StringReader(content);
-        JsonReader jreader = Json.createReader(reader);
-        return jreader.readObject();  
-    }
+
     
     byte[] concatArrays(byte[] a, byte[] b) {
         int al = a.length;
@@ -181,24 +144,17 @@ public class Decryptor {
         }
     } 
     
-    byte[] readRKToByteArray(String fileName) throws Exception{
+    byte[] convertOOERToArray(String fileName) throws Exception{
+        ObjectMapper mapper = new ObjectMapper();
         String content = new String(Files.readAllBytes(Paths.get(fileName)));
-        StringReader reader = new StringReader(content);
-        JsonReader jreader = Json.createReader(reader);
-        JsonArray ja = jreader.readObject().getJsonArray("RK");
-        byte[] rkba = new byte[ja.size()];
-        for ( int i = 0 ; i < rkba.length ; i++ ) {
-            rkba[i] = (byte) ja.getInt(i);
+        List<Byte> list = mapper.readValue(content, new TypeReference<List<Byte>>(){});           
+        byte[] rkba = new byte[list.size()];
+        int i = 0;
+        for(Byte item: list) {
+            rkba[i] = item.byteValue();
+            i++;
         }
         return rkba;
-    }
-    
-    public byte[] jsonToByteArray(JsonArray jjaa) throws Exception{
-        byte[] ba = new byte[jjaa.size()];
-        for ( int i = 0 ; i < ba.length ; i++ ) {
-            ba[i] = (byte) jjaa.getInt(i);
-        }
-        return ba;
     }
     
     String decryptOOPassword(byte[] rkba, String encryptedPassword) throws Exception {
