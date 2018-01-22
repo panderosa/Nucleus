@@ -6,11 +6,14 @@
 package nucleus.dm;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
@@ -48,6 +52,7 @@ import jxl.format.Border;
  */
 public class Screen extends Application {
     
+    private Stage window;
     private Subscription sub;
     private Button button1;
     private ObservableList<Action> observableActions;
@@ -69,6 +74,7 @@ public class Screen extends Application {
     
     @Override
     public void start(Stage stage) throws Exception {
+        window = stage;
         FileChooser fileChooser = new FileChooser();
         BorderPane border = new BorderPane();
         HBox hbox = addHBox();
@@ -80,18 +86,18 @@ public class Screen extends Application {
         Scene scene = new Scene(border);
         scene.getStylesheets().add("styleSheets.css");
         button1.setOnAction(e->{
-            File file = fileChooser.showOpenDialog(stage);
+            File file = fileChooser.showOpenDialog(window);
             if (file != null) {
                 String txt = sub.readConfiguration(file);
                 currentConfiguration = sub.getConfiguration();
                 updateConfigurationPane();
-                area.appendText(txt);    
+                outputText(txt);  
             }                    
         });
         
-        stage.setScene(scene);                   
-        stage.setTitle("DADA");
-        stage.show();
+        window.setScene(scene);                   
+        window.setTitle("DADA");
+        window.show();
     }
     
     public HBox addHBox() {
@@ -105,18 +111,35 @@ public class Screen extends Application {
         button1.setPrefSize(150, 20);
         Button button2 = new Button("Run Action");
         button2.setPrefSize(150, 20);
+        Button button3 = new Button("Parse JSON File");
+        button3.setPrefSize(150, 20);
+        Button button4 = new Button("Clear Token");
+        button4.setPrefSize(150, 20);
         
         
         
         button2.setOnAction(e->{
             String[] msg = processParameters();
             String out = sub.wrapperMethodForGui(msg);
-            area.setText(out);
+            outputText(out);
             //String txt = sub.wrapperMethod(msg);
             //AlertBox.display(msg);
         });
         
-        hbox.getChildren().addAll(button1,button2);
+        button3.setOnAction(e->{
+            FileChooser fileChooser = new FileChooser();
+            File file = fileChooser.showOpenDialog(window);
+            if(file != null) {
+                String out = parseJSON(file);
+                outputText(out);
+            }
+        });
+        
+        button4.setOnAction(e->{
+            sub.clearToken();
+        });
+        
+        hbox.getChildren().addAll(button1,button2,button3,button4);
         return hbox;
     }
     
@@ -236,10 +259,18 @@ public class Screen extends Application {
             String key = keys.next();
             Conf item = currentConfiguration.get(key);
             Label label = new Label(item.getDisplayName());
-            TextField field = new TextField();
-            field.setId(key);
-            field.setText(item.getValue());
-            configurationPane.addRow(i, label,field);
+            if (item.getGuiType().equalsIgnoreCase("plain")) {
+                TextField field = new TextField();
+                field.setId(key);
+                field.setText(item.getValue());
+                configurationPane.addRow(i, label,field);
+            }
+            else if (item.getGuiType().equalsIgnoreCase("hidden")) {
+                PasswordField pw = new PasswordField();
+                pw.setId(key);
+                pw.setText(item.getValue());
+                configurationPane.addRow(i, label,pw);
+            }
             i++;
         }
         Button button = new Button("Apply");
@@ -248,22 +279,40 @@ public class Screen extends Application {
         
         button.setOnAction( v -> {
             currentConfiguration.forEach((id,cf)->{
-                TextField tf = (TextField) configurationPane.lookup("#"+id);
                 String value = "";
-                if (tf != null)
-                    value = tf.getText();
-                cf.setValue(value);
+                Node node = configurationPane.lookup("#"+id);
+                if (node != null) {
+                    if (cf.getGuiType().equalsIgnoreCase("plain")) {
+                        value = ((TextField) node).getText();
+                        System.out.println(value);
+                    }
+                    else if (cf.getGuiType().equalsIgnoreCase("hidden")) {
+                        value = ((PasswordField) node).getText();
+                        System.out.println(value);
+                    }
+                    cf.setValue(value);
+                    currentConfiguration.put(id, cf);
+                }
             });
             sub.setConfiguration(currentConfiguration);
         });
     }
     
+    
     public BorderPane addBottom() {
         BorderPane bp = new BorderPane();
+        HBox hbox = new HBox();
+        hbox.setPadding(new Insets(5));
+        Button bclear = new Button("Clear");
+        hbox.getChildren().add(bclear);
+        
+        bclear.setOnAction(e->{
+            area.clear();
+        });
         
         area = new TextArea();
         area.setPrefWidth(800);
-        area.setPrefHeight(400);
+        area.setMinHeight(400);
         area.setWrapText(true);
         area.setEditable(false);
         //area.setMaxWidth(2000);
@@ -272,9 +321,8 @@ public class Screen extends Application {
             area.setScrollTop(Double.MIN_VALUE);
         });
         
-        
+        bp.setTop(hbox);
         bp.setCenter(area);
-        
         return bp;
     }
     
@@ -285,4 +333,29 @@ public class Screen extends Application {
         String out = baos.toString();
         return out;
     }
+    
+    private String dateToString() {
+        return String.format("-------------- %1$tH:%1$tM:%1$tS %1$tY/%1$tm/%1$td ---------------%n", Calendar.getInstance());
+    }
+    
+    
+    void outputText(String txt) {
+        area.appendText(dateToString());
+        area.appendText(txt);
+        area.appendText("\n");
+    }
+    
+    String parseJSON(File file) {
+        String out;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode json = mapper.readTree(file);
+            out = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
+        }
+        catch(Exception e) {
+            out = processException(e);
+        }
+        return out;
+    }
+    
 }

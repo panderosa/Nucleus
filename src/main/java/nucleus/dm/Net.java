@@ -58,7 +58,14 @@ public class Net {
         initializeHttpClient();
     }
     
+    void clearToken() {
+        token = null;
+    }
     
+        
+    String getRawToken() {
+        return token;
+    }
 
     public void initializeHttpClient() throws Exception {
         BasicHttpClientConnectionManager bhccm; 
@@ -82,22 +89,10 @@ public class Net {
          httpClient.close();
     }
     
-      
-    private String decryptPassword(String encpassword) throws Exception {
-        Decryptor decryptor = new Decryptor();
-        return decryptor.decryptPassword(encpassword);
-    }
-    
-    private String encryptPassword(String password) throws Exception {
-        Decryptor decryptor = new Decryptor();
-        return decryptor.encryptPassword(password);
-    }
-    
 
     public void requestToken(String idmUser, String idmPassword, String consumer, String consumerPassword, String tenant) throws Exception {
         CredentialsProvider credsProvider = new BasicCredentialsProvider();
-        String dpassword = decryptPassword(idmPassword);
-        credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(idmUser,dpassword));
+        credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(idmUser,idmPassword));
         AuthCache authCache = new BasicAuthCache();
         BasicScheme basicAuth = new BasicScheme();
         authCache.put(targetHost, basicAuth);
@@ -108,21 +103,12 @@ public class Net {
         HttpPost httpPost = new HttpPost("/idm-service/v2.0/tokens");
         httpPost.addHeader("Accept", "application/json");
         httpPost.addHeader("Content-Type", "application/json");
-        String dconsumerPassword = decryptPassword(consumerPassword);
-        
-        /*JsonObject jbody = Json.createObjectBuilder()
-                .add("tenantName", tenant)
-                .add("passwordCredentials",Json.createObjectBuilder()
-                        .add("username", username)
-                        .add("password", dconsumerPassword))
-                        .build();
-        String body = jbody.toString();*/
         ObjectMapper mapper = new ObjectMapper();
         Map<String,Object> payload = new HashMap<>();
         Map<String,String> passwordCredentials = new HashMap<>();
         payload.put("tenantName", tenant);
         passwordCredentials.put("username", consumer);
-        passwordCredentials.put("password", dconsumerPassword);
+        passwordCredentials.put("password", consumerPassword);
         payload.put("passwordCredentials", passwordCredentials);
         String body = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);      
         HttpEntity bodyEntity = new StringEntity(body);
@@ -136,10 +122,7 @@ public class Net {
         response.close();
         token = responseString;
     }  
-    
-    public String getRawToken() {
-        return this.token;
-    }
+
         
     public String getHttp(String tkn, String userName, String password, String uri, String acceptContent) throws Exception {
         CloseableHttpResponse response;
@@ -152,8 +135,7 @@ public class Net {
         }
         else if ( userName != null && password != null) {
             CredentialsProvider credsProvider = new BasicCredentialsProvider();
-            String npassword = decryptPassword(password);
-            credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,npassword));
+            credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,password));
             AuthCache authCache = new BasicAuthCache();
             BasicScheme basicAuth = new BasicScheme();
             authCache.put(targetHost, basicAuth);
@@ -186,8 +168,7 @@ public class Net {
             }
             else if ( userName != null && password != null) {
                 CredentialsProvider credsProvider = new BasicCredentialsProvider();
-                String npassword = decryptPassword(password);
-                credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,npassword));
+                credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,password));
                 AuthCache authCache = new BasicAuthCache();
                 BasicScheme basicAuth = new BasicScheme();
                 authCache.put(targetHost, basicAuth);
@@ -222,8 +203,7 @@ public class Net {
         }
         else {
             CredentialsProvider credsProvider = new BasicCredentialsProvider();
-            String npassword = decryptPassword(password);
-            credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,npassword));
+            credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,password));
             AuthCache authCache = new BasicAuthCache();
             BasicScheme basicAuth = new BasicScheme();
             authCache.put(targetHost, basicAuth);
@@ -256,8 +236,7 @@ public class Net {
         }
         else {
             CredentialsProvider credsProvider = new BasicCredentialsProvider();
-            String npassword = decryptPassword(password);
-            credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,npassword));
+            credsProvider.setCredentials(new AuthScope(targetHost.getHostName(),targetHost.getPort()),new UsernamePasswordCredentials(userName,password));
             AuthCache authCache = new BasicAuthCache();
             BasicScheme basicAuth = new BasicScheme();
             authCache.put(targetHost, basicAuth);
