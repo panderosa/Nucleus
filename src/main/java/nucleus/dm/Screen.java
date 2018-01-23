@@ -23,6 +23,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -32,6 +33,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
@@ -56,9 +58,13 @@ public class Screen extends Application {
     private Subscription sub;
     private Button button1;
     private ObservableList<Action> observableActions;
+    private HBox topPane;
+    private VBox actionPane;
     private GridPane parametersPane;
     private GridPane configurationPane;
-    private TextArea area;
+    private BorderPane outputPane;
+    private TextArea outputArea;
+    private TextArea logArea;
     Action currentAction;
     private Map<String,Conf> currentConfiguration;
     
@@ -68,7 +74,7 @@ public class Screen extends Application {
     
     @Override
     public void init() {
-        sub = new Subscription();
+        sub = new Subscription(this);
         observableActions = FXCollections.observableArrayList(sub.getActions());   
     }
     
@@ -77,12 +83,18 @@ public class Screen extends Application {
         window = stage;
         FileChooser fileChooser = new FileChooser();
         BorderPane border = new BorderPane();
-        HBox hbox = addHBox();
-        border.setTop(hbox);
-        border.setLeft(addVBox());
-        border.setCenter(addParametersPane());
-        border.setRight(addConfigurationPane());
-        border.setBottom(addBottom());
+        topPane = addTopPane();
+        actionPane = addActionsPane();
+        parametersPane = addParametersPane();
+        configurationPane = addConfigurationPane();
+        outputPane = addBottom();
+        
+        border.setTop(topPane);
+        border.setLeft(actionPane);
+        border.setCenter(parametersPane);
+        border.setRight(configurationPane);
+        border.setBottom(outputPane);
+        
         Scene scene = new Scene(border);
         scene.getStylesheets().add("styleSheets.css");
         button1.setOnAction(e->{
@@ -100,7 +112,7 @@ public class Screen extends Application {
         window.show();
     }
     
-    public HBox addHBox() {
+    public HBox addTopPane() {
         
         HBox hbox = new HBox();
         hbox.setPadding(new Insets(15,12,15,12));
@@ -115,8 +127,6 @@ public class Screen extends Application {
         button3.setPrefSize(150, 20);
         Button button4 = new Button("Clear Token");
         button4.setPrefSize(150, 20);
-        
-        
         
         button2.setOnAction(e->{
             String[] msg = processParameters();
@@ -163,12 +173,12 @@ public class Screen extends Application {
     }
     
     
-    public VBox addVBox() {
+    public VBox addActionsPane() {
         VBox vbox = new VBox();
         Label title = new Label("List of Actions");
         title.getStyleClass().add("title");
         ListView<Action> actionlist = new ListView<Action>(observableActions);
-        actionlist.setPrefHeight(200);
+        actionlist.setPrefHeight(400);
         actionlist.getSelectionModel().setSelectionMode(SelectionMode.SINGLE); 
         actionlist.setCellFactory(new Callback<ListView<Action>,ListCell<Action>>() {
             @Override
@@ -184,7 +194,6 @@ public class Screen extends Application {
                 };
                 return cell;
             };
-            
         });
         
         actionlist.getSelectionModel().selectedItemProperty().addListener((ob,oldAction,newAction)->{
@@ -199,25 +208,25 @@ public class Screen extends Application {
         
         vbox.getChildren().add(title);
         vbox.getChildren().add(actionlist);
-        vbox.setPrefWidth(250);
-        vbox.setPrefHeight(300);
+        vbox.setPrefWidth(400);
+        vbox.setPrefHeight(500);
         vbox.getStyleClass().add("vbox");
         return vbox;
     }
     
     public GridPane addParametersPane() {
-        parametersPane = new GridPane();
-        parametersPane.setPadding(new Insets(10));
-        parametersPane.setVgap(5);
-        parametersPane.setHgap(10);
-        parametersPane.getStyleClass().add("grid");
+        GridPane pp  = new GridPane();
+        pp.setPadding(new Insets(10));
+        pp.setVgap(5);
+        pp.setHgap(10);
+        pp.getStyleClass().add("grid");
         Label title = new Label("Action Parameters");
         title.getStyleClass().add("title");
         GridPane.setConstraints(title, 0, 0, 2, 1);
-        parametersPane.getChildren().add(0, title);
-        //parametersPane.setPrefWidth(500);
-        //parametersPane.setGridLinesVisible(true);
-        return parametersPane;
+        pp.getChildren().add(0, title);
+        pp.setPrefWidth(400);
+        pp.setAlignment(Pos.TOP_CENTER);
+        return pp;
     }
     
     public void updateParametersPane(Action a) {
@@ -237,17 +246,18 @@ public class Screen extends Application {
     }
     
     public GridPane addConfigurationPane() {
-        configurationPane = new GridPane();
-        configurationPane.setPadding(new Insets(10));
-        configurationPane.setVgap(5);
-        configurationPane.setHgap(10);
-        configurationPane.getStyleClass().add("grid");
+        GridPane cp = new GridPane();
+        cp.setPadding(new Insets(10));
+        cp.setVgap(5);
+        cp.setHgap(10);
+        cp.getStyleClass().add("grid");
         Label title = new Label("Infrastructure Configuration");
         title.getStyleClass().add("title");
         GridPane.setConstraints(title, 0, 0, 2, 1);
-        configurationPane.getChildren().add(0, title);
-        //parametersPane.setPrefWidth(500);
-        return configurationPane;
+        cp.getChildren().add(0, title);
+        cp.setAlignment(Pos.TOP_CENTER);
+        cp.setPrefWidth(500);
+        return cp;
     }
     
     public void updateConfigurationPane() {
@@ -303,26 +313,47 @@ public class Screen extends Application {
         BorderPane bp = new BorderPane();
         HBox hbox = new HBox();
         hbox.setPadding(new Insets(5));
-        Button bclear = new Button("Clear");
-        hbox.getChildren().add(bclear);
+        Button bclearL = new Button("Clear Log");
+        Button bclearO = new Button("Clear Output");
+        Button testMe = new Button("testMe");
+        hbox.getChildren().addAll(bclearL,bclearO,testMe);
         
-        bclear.setOnAction(e->{
-            area.clear();
+        bclearL.setOnAction(e->{
+            logArea.clear();
         });
         
-        area = new TextArea();
-        area.setPrefWidth(800);
-        area.setMinHeight(400);
-        area.setWrapText(true);
-        area.setEditable(false);
-        //area.setMaxWidth(2000);
+        bclearO.setOnAction(e->{
+            outputArea.clear();
+        });
         
-        area.textProperty().addListener((o,oldv,newv)->{
-            area.setScrollTop(Double.MIN_VALUE);
+        testMe.setOnAction(e->{
+            ScrollBar scrollBar = (ScrollBar) outputArea.lookup(".scroll-bar:vertical");
+            outputText(scrollBar.toString());
+        });
+        
+        VBox vbox = new VBox();
+        vbox.setPadding(new Insets(5)); 
+        
+        logArea = new TextArea();
+        logArea.getStyleClass().add("log-area");
+        
+        outputArea = new TextArea();
+        outputArea.setPrefWidth(800);
+        outputArea.setPrefHeight(400);
+        outputArea.setWrapText(true);
+        outputArea.setEditable(false);
+        outputArea.getStyleClass().add("outputArea");
+        //outputArea.setMaxWidth(2000);
+        
+        vbox.getChildren().addAll(logArea,outputArea);
+        
+        
+        outputArea.textProperty().addListener((o,oldv,newv)->{
+            outputArea.setScrollTop(Double.MIN_VALUE);
         });
         
         bp.setTop(hbox);
-        bp.setCenter(area);
+        bp.setCenter(vbox);
         return bp;
     }
     
@@ -334,15 +365,20 @@ public class Screen extends Application {
         return out;
     }
     
-    private String dateToString() {
+    private String printTimestamp() {
         return String.format("-------------- %1$tH:%1$tM:%1$tS %1$tY/%1$tm/%1$td ---------------%n", Calendar.getInstance());
     }
     
+    void outputLog(String txt, boolean useTimestamp) {
+        if (useTimestamp)
+            logArea.appendText(printTimestamp());
+        logArea.appendText(txt);
+        logArea.appendText("\n");
+    }
     
-    void outputText(String txt) {
-        area.appendText(dateToString());
-        area.appendText(txt);
-        area.appendText("\n");
+    
+    void outputText(String txt) {        
+        outputArea.appendText(txt);
     }
     
     String parseJSON(File file) {

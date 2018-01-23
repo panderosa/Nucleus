@@ -25,27 +25,28 @@ public class Action {
         this.displayName = displayName;
     }
 
-    public String getName() {
+    String getName() {
         return name;
     }
     
-    public String getDisplayName() {
+    String getDisplayName() {
         return displayName;
     }
 
-    public void setName(String name) {
+    void setName(String name) {
         this.name = name;
     }
 
-    public HashMap<String, String> getParameters() {
+    HashMap<String, String> getParameters() {
         return parameters;
     }
 
-    public void setParameters(HashMap<String, String> parameters) {
+    void setParameters(HashMap<String, String> parameters) {
         this.parameters = parameters;
     }
     
-    public void addParameter(String a, String b) {
+    void addParameter(String a, String b) {
         this.parameters.put(a, b);
     }
+    
 }

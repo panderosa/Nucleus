@@ -16,3 +16,15 @@
     -fx-font-size: 20;
 }
 
+
+.outputArea {
+    -fx-vbar-policy: always;
+    -fx-hbar-policy: always;
+}
+
+
+.log-area {
+    -fx-vbar-policy:always;
+    -fx-hbar-policy:always;
+}
+

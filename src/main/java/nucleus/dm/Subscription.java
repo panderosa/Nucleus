@@ -40,6 +40,7 @@ public class Subscription {
     private Map<String,String> input;
     private List<Action> actions;
     private Map<String,Conf> configuration;
+    private Screen screen;
     
     public static void main(String[] args) throws Exception {
      
@@ -50,7 +51,8 @@ public class Subscription {
         input = new HashMap<>();
     }    
     
-    public Subscription() {   
+    public Subscription(Screen screen) {   
+        this.screen = screen;
         initializeActionsList();
         input = new HashMap<>();
     }  
@@ -244,8 +246,10 @@ public class Subscription {
     }
     
     void initCSAClient() throws Exception {
-        if (csa == null)
+        if (csa == null) {
+            screen.outputLog("Initializing CSA Client", true);
             csa = new Net(configuration.get("csaServer").getValue(),Integer.parseInt(configuration.get("csaPort").getValue()),configuration.get("csaProtocol").getValue());
+        }
     }
     
     void parseArguments(String[] args) throws Exception {
@@ -658,8 +662,7 @@ public class Subscription {
         String uri = "/csa/api/mpp/mpp-request/" + meta.get("serviceId") + "?catalogId=" + meta.get("catalogId");
         String ac = "application/json";
         String cnt = "multipart/form-data; boundary=" + BOUNDARY;
-        System.out.print("Ordering subscription.");
-        stoper();
+        screen.outputLog("ordering subscription", true);
         String output = csa.postHttp(token, null, null, uri, pyl, ac, cnt);
         return output;
     }
@@ -681,6 +684,7 @@ public class Subscription {
         String userId = getUserId();
         String uri = "/csa/rest/artifact/" + componentId + "?userIdentifier=" + userId + "&view=propertyinfo&scope=view&_action_=merge&property_values_action_=update";
         String payload = "<ServiceComponent><id>" + componentId + "</id><property><name>" + propertyName + "</name><displayName>" + propertyDisplayName + "</displayName><valueType><name>" + propertyValueType + "</name></valueType><values><value>" + propertyValue + "</value></values><consumerVisible>" + propertyVisibility + "</consumerVisible></property></ServiceComponent>";      
+        screen.outputLog("update service component property", true);
         String output = csa.putHttp(null, configuration.get("csaAdmin").getValue(), configuration.get("csaAdminPassword").getValue(), uri, payload, "application/xml", "application/xml");
         return output;
     }
@@ -697,6 +701,7 @@ public class Subscription {
         String onBehalf = configuration.get("onBehalf").getValue();
         uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
         String token = requestToken();
+        screen.outputLog("requesting service offering for subscription", true);
         String out = csa.getHttp(token, null, null, uri, "application/json");
         return out;
     }
@@ -709,6 +714,7 @@ public class Subscription {
         String sid = mapper.readTree(sub).get("ext").get("csa_service_instance_id").asText();
         String service = viewServiceInstanceDetails(sid);
         Map<String,Map> components = new HashMap<>();
+        screen.outputLog("retrieving service components properties", true);
         mapper.readTree(service).get("components").forEach(item->{
             Map<String,JsonNode> properties = new HashMap<>();
             String dn = item.get("displayName").asText();
@@ -737,6 +743,7 @@ public class Subscription {
         uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
         initCSAClient();
         String token = requestToken();
+        screen.outputLog("requesting service instance details", true);
         String output = csa.getHttp(token, null, null, uri, acceptContent);
         return output;
     }
@@ -752,6 +759,7 @@ public class Subscription {
     }
     
     String getErrorInfoFromServiceComposite(String service) throws Exception {
+        screen.outputLog("Retrieving Subscription Error Info from Service Composite", true);
         Map<String,Object> obj = new HashMap<String,Object>();
         //String content = new String(Files.readAllBytes(Paths.get("instance.json")),"UTF-8");
         ObjectMapper mapper = new ObjectMapper();
@@ -790,13 +798,10 @@ public class Subscription {
     }
     
     String getUserId() throws Exception {
-        System.out.print("Retrieving CSA User Identifier for REST Operations.");
         String ac = "application/json";
         String uri = "/csa/rest/login/" + configuration.get("csaAdminOrg").getValue() + "/" + configuration.get("csaAdmin").getValue() + "/";
-        stoper(); 
+        screen.outputLog("Getting CSA User Id for REST", true);
         String output = csa.getHttp(null, configuration.get("transportUser").getValue(), configuration.get("transportPassword").getValue(), uri, ac);
-        int delta = stoper();
-        System.out.format(" Duration(ms) %d%n",delta);
         ObjectMapper mapper = new ObjectMapper();        
         return mapper.readTree(output).get("id").asText();
     }
@@ -816,7 +821,7 @@ public class Subscription {
         initCSAClient();
         String userId = getUserId();
         String uri = "/csa/rest/availablevalues/" + fieldId + "?userIdentifier=" + userId;
-        System.out.println(uri);
+        screen.outputLog("Getting a field available values", true);
         String output = csa.postHttp(null, configuration.get("transportUser").getValue(), configuration.get("transportPassword").getValue(), uri, fields, "application/json", "application/json");
         ObjectMapper mapper = new ObjectMapper();
         if (filter) {
@@ -861,6 +866,7 @@ public class Subscription {
         String userId = getUserId();
         String uri = "/csa/rest/processinstances/" + csaProcessId + "?userIdentifier=" + userId + "&scope=view&view=processinstancestate&action=merge";	
         String payload = "<ProcessInstance><id>"+csaProcessId+"</id><processInstanceState><name>"+processState+"</name></processInstanceState><processReturnCode><name>"+processReturnCode+"</name></processReturnCode><status>"+processStatus+"</status></ProcessInstance>";
+        screen.outputLog("Updating Process Instance", true);
         String output = csa.putHttp(null, configuration.get("csaAdmin").getValue(), configuration.get("csaAdminPassword").getValue(), uri, payload, "application/xml", "application/xml");
         return output;
     }
@@ -882,6 +888,7 @@ public class Subscription {
         if (api.equalsIgnoreCase("service")) {
             uri = "/csa/api/service/subscription/" + id;
             String ac = "application/json";
+            screen.outputLog("Getting subscription details with service API", true);
             output = csa.getHttp(null, configuration.get("csaAdmin").getValue(), configuration.get("csaAdminPassword").getValue(), uri, acceptContent);
         }
         else {
@@ -889,6 +896,7 @@ public class Subscription {
             String onBehalf = configuration.get("onBehalf").getValue();
             uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
             String token = requestToken();
+            screen.outputLog("Getting subscription details with mpp API", true);
             output = csa.getHttp(token, null, null, uri, acceptContent);
         }
         return output;
@@ -917,22 +925,16 @@ public class Subscription {
         String uri = "/csa/api/mpp/mpp-request/" + id;
         String onBehalf = configuration.get("onBehalf").getValue();
         uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
-        System.out.print("Retrieving request details from CSA.");
-        stoper();
+        screen.outputLog("Getting CSA Request Details", true);
         String out = csa.getHttp(token, null, null, uri, "application/json");
-        int delta = stoper();
-        System.out.format(" Duration(ms) %d%n",delta);
         return out;
     }
      
     String requestToken() throws Exception {
         String rtoken = csa.getRawToken();
         if (rtoken == null) {
-            System.out.print("Requesting CSA Token...");
-            stoper();
+            screen.outputLog("Requesting CSA Token", true);
             csa.requestToken(configuration.get("idmUser").getValue(), configuration.get("idmPassword").getValue(), configuration.get("csaConsumer").getValue(), configuration.get("csaConsumerPassword").getValue(), configuration.get("csaTenant").getValue());
-            int delta = stoper();
-            System.out.format(" Duration(ms) %d%n",delta);
             rtoken = csa.getRawToken();
         }
         ObjectMapper mapper = new ObjectMapper();
@@ -944,11 +946,8 @@ public class Subscription {
         initCSAClient();
         ObjectMapper mapper = new ObjectMapper();
         String format = arguments.get("format");
-        System.out.print("Requesting CSA Token...");
-        stoper();
+        screen.outputLog("Requesting CSA Token", true);
         csa.requestToken(configuration.get("idmUser").getValue(), configuration.get("idmPassword").getValue(), configuration.get("csaConsumer").getValue(), configuration.get("csaConsumerPassword").getValue(), configuration.get("csaTenant").getValue());
-        int delta = stoper();
-        System.out.format(" Duration(ms) %d%n",delta);
         String rtoken = csa.getRawToken();
         if (format.equalsIgnoreCase("short")) {            
             return mapper.readTree(rtoken).get("token").get("id").asText();
