@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintWriter;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -21,6 +22,7 @@ import java.util.Map.Entry;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -128,10 +130,30 @@ public class Screen extends Application {
         Button button4 = new Button("Clear Token");
         button4.setPrefSize(150, 20);
         
-        button2.setOnAction(e->{
+        /*button2.setOnAction(e->{
             String[] msg = processParameters();
             String out = sub.wrapperMethodForGui(msg);
             outputText(out);
+            //String txt = sub.wrapperMethod(msg);
+            //AlertBox.display(msg);
+        });*/
+        button2.setOnAction(e->{
+            try {
+                Task task = new Task<Void>() {
+                    @Override
+                    public Void call() throws Exception {
+                        currentAction.getParameters(parametersPane);
+                        String out = currentAction.runAction(sub);
+                        outputText(out);
+                        return null;
+                    }
+                };
+                new Thread(task).start();
+            }
+            catch(Exception exp) {
+                String out = processException(exp);
+                this.outputLog(out, true);
+            }
             //String txt = sub.wrapperMethod(msg);
             //AlertBox.display(msg);
         });
@@ -153,7 +175,7 @@ public class Screen extends Application {
         return hbox;
     }
     
-    private String[] processParameters() {
+    /*String[] processParameters() {
         List<String> params = new ArrayList<>();
         params.add(String.format("action=%s", currentAction.getName()));       
         Iterator<Entry<String,String>> p = currentAction.getParameters().entrySet().iterator();        
@@ -170,7 +192,11 @@ public class Screen extends Application {
         String[] strArr = null;
         strArr = params.toArray(new String[params.size()]);
         return strArr;
-    }
+    }*/
+    
+    /*String[] processParameters() {
+        return currentAction.collectParameters(parametersPane);
+    }*/
     
     
     public VBox addActionsPane() {
@@ -197,7 +223,7 @@ public class Screen extends Application {
         });
         
         actionlist.getSelectionModel().selectedItemProperty().addListener((ob,oldAction,newAction)->{
-            System.out.println(newAction);
+            //System.out.println(newAction);
             currentAction = newAction;
             updateParametersPane(newAction);
 
@@ -229,7 +255,7 @@ public class Screen extends Application {
         return pp;
     }
     
-    public void updateParametersPane(Action a) {
+    /*public void updateParametersPane(Action a) {
         ObservableList<Node> children = parametersPane.getChildren();                
         children.remove(1, children.size());          
         int i = 1;
@@ -243,6 +269,10 @@ public class Screen extends Application {
             parametersPane.addRow(i, label,field);
             i++;
         }
+    }*/
+    
+    public void updateParametersPane(Action a) {
+        a.buildMyPane(parametersPane, window);
     }
     
     public GridPane addConfigurationPane() {
@@ -327,8 +357,20 @@ public class Screen extends Application {
         });
         
         testMe.setOnAction(e->{
-            ScrollBar scrollBar = (ScrollBar) outputArea.lookup(".scroll-bar:vertical");
-            outputText(scrollBar.toString());
+            StringBuilder sb = new StringBuilder();
+            Method[] methods = sub.getClass().getMethods();
+            for (Method method: methods) {
+                String line;
+                String name = method.getName();
+                line = name;
+                Class[] parameters = method.getParameterTypes();
+                for(Class parameter: parameters) {
+                    String mn = parameter.getName();
+                    line = String.format("%s %s", line, mn);
+                }
+                line = line + "\n";
+                this.outputText(line);
+            }
         });
         
         VBox vbox = new VBox();
@@ -393,5 +435,6 @@ public class Screen extends Application {
         }
         return out;
     }
+    
     
 }

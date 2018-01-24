@@ -15,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintWriter;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -26,6 +27,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.Node;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 
 
 public class Subscription {
@@ -41,10 +51,12 @@ public class Subscription {
     private List<Action> actions;
     private Map<String,Conf> configuration;
     private Screen screen;
+    private Subscription subscription;
     
     public static void main(String[] args) throws Exception {
      
     }
+    
     
     public Subscription(String[] args) throws Exception {
         parseArguments(args);
@@ -62,16 +74,10 @@ public class Subscription {
     }
     
     // (1) Add new action definition
-    private void initializeActionsList() {       
-        Action a100 = new Action("orderSubscription","Order Subscription");
-        a100.addParameter("template", "XLS template with order request");
+    /*private void initializeActionsList() {       
         
         Action a110 = new Action("cancelSubscription","Cancel Subscription");
         a110.addParameter("subscriptionId", "Subscription Id");
-        
-        Action a200 = new Action("viewSubscriptionDetails","View Subscription Details");
-        a200.addParameter("subscriptionId", "Subscription Id");
-        a200.addParameter("apiName", "CSA API, use mpp|service");
         
         //getServiceInstanceForSubscription
         Action a210 = new Action("viewServiceForSubscription","View Service Instance For Subscription");
@@ -90,14 +96,9 @@ public class Subscription {
         Action a240 = new Action("viewServiceComponentsProperties","View Service Components Properties");
         a240.addParameter("subscriptionId", "Subscription Id");
         
-        Action a300 = new Action("getAvailableValues","Get Available Values");
-        a300.addParameter("fieldId", "Field Id (without prefix)");
-        a300.addParameter("inputFieldName", "Input Field Name");
-        a300.addParameter("inputFieldValue", "Input Field Value");
-        a300.addParameter("filter", "Limit Data to Field Values");
+
         
-        Action a400 = new Action("viewRequestDetails","View Request Details");
-        a400.addParameter("requestId", "Request Id");
+
         
         Action a500 = new Action("viewSubscriptionErrorInfo","View Subscription Error Info");
         a500.addParameter("subscriptionId", "Subscription Id");
@@ -119,62 +120,213 @@ public class Subscription {
         a800.addParameter("processReturnCode", "Return Code, e.g. SUCCESS, FAILURE");
         a800.addParameter("processStatus", "Status Information");
         
-        Action a900 = new Action("generateToken","Request and Print Consumer Token");
-        a900.addParameter("format", "Token Format (short)");
+        
         
         actions = Arrays.asList(a100,a110,a200,a210,a220,a230,a240,a300,a400,a500,a600,a700,a800,a900);   
-    }
-      
+    }*/
     
-    // (2) map action to Java method
-    public String wrapperMethodForGui(String[] args) {
+    void initializeActionsList() {
+        
+        Action a100 = new Action("orderSubscription","Order Subscription") {
+            
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                Label label = new Label("XLS Template Name");
+                TextField field = new TextField();
+                field.setEditable(false);
+                field.setPromptText("Enter to select template");
+                field.setId("template");
+                
+                FileChooser fc = new FileChooser();
+                field.setOnMouseClicked(e->{
+                    File file = fc.showOpenDialog(stage);
+                    field.setText(file.getAbsolutePath());
+                });                
+                gp.addRow(1, label,field);                
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName());       
+                params.put("template", ((TextField) gp.lookup("#template")).getText());
+                setParameters(params);
+            }
+            
+        };
+        
+        
+        Action a200 = new Action("viewSubscriptionDetails","View Subscription Details") {           
+         
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                Label label = new Label("Subscription Id");
+                TextField field = new TextField();
+                field.setPromptText("Enter subscription id");
+                field.setId("subscriptionId");
+                Label label1 = new Label("CSA API Type");
+                ChoiceBox<String> cb = new ChoiceBox<>(FXCollections.observableArrayList("mpp","service"));
+                cb.setId("apiName");
+                // Set default Value
+                cb.setValue("mpp");               
+                               
+                gp.addRow(1, label,field); 
+                gp.addRow(2, label1,cb);
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName());       
+                params.put("subscriptionId", ((TextField) gp.lookup("#subscriptionId")).getText());
+                params.put("apiName", ((ChoiceBox<String>) gp.lookup("#apiName")).getValue());
+                setParameters(params);
+            }
+
+        };
+        
+
+        Action a210 = new Action("viewServiceInstanceDetails","View Service Instance Details") {           
+         
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                Label label = new Label("Service Instance Id");
+                TextField field = new TextField();
+                field.setPromptText("Enter service id");
+                field.setId("serviceInstanceId");
+                                                             
+                gp.addRow(1, label,field); 
+
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName());       
+                params.put("serviceInstanceId", ((TextField) gp.lookup("#serviceInstanceId")).getText());
+                setParameters(params);
+            }
+
+        };
+        
+        
+        Action a220 = new Action("viewRequestDetails","View Request Details") {           
+         
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                Label label = new Label("Request Id");
+                TextField field = new TextField();
+                field.setPromptText("Enter request id");
+                field.setId("requestId");
+                                                             
+                gp.addRow(1, label,field); 
+
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName());       
+                params.put("requestId", ((TextField) gp.lookup("#requestId")).getText());
+                setParameters(params);
+            }
+
+        };
+        
+        //Action a900 = new Action("generateToken","Request and Print Consumer Token");
+        //a900.addParameter("format", "Token Format (short)");
+        
+        Action a230 = new Action("printToken","Print CSA Token") {           
+         
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                Label label = new Label("Token format");
+                ChoiceBox<String> cb = new ChoiceBox<>(FXCollections.observableArrayList("short","long"));
+                cb.setId("format");
+                // Set default Value
+                cb.setValue("short"); 
+                                                             
+                gp.addRow(1, label,cb); 
+
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName());       
+                params.put("format", ((ChoiceBox<String>) gp.lookup("#format")).getValue());
+                setParameters(params);
+            }
+
+        };
+        
+        Action a240 = new Action("getAvailableValues","Get Available Values for Field") {           
+         
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                Label label = new Label("Field Id");
+                TextField field = new TextField();
+                field.setPromptText("Enter field id (without prefix)");
+                field.setId("fieldId");
+                
+                Label label1 = new Label("Input Field Name");
+                TextField field1 = new TextField();
+                field1.setPromptText("Enter input field name");
+                field1.setId("inputFieldName");
+                
+                Label label2 = new Label("Input Field Value");
+                TextField field2 = new TextField();
+                field2.setPromptText("Enter input field value");
+                field2.setId("inputFieldValue");
+                
+                Label label3 = new Label("Output Format");
+                ChoiceBox<String> cb = new ChoiceBox<>(FXCollections.observableArrayList("short","long"));
+                cb.setId("format");
+                // Set default Value
+                cb.setValue("short"); 
+                                                             
+                gp.addRow(1, label,field); 
+                gp.addRow(2, label1,field1); 
+                gp.addRow(3, label2,field2);
+                gp.addRow(4, label3,cb);
+                
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName()); 
+                params.put("fieldId", ((TextField) gp.lookup("#fieldId")).getText());
+                params.put("inputFieldName", ((TextField) gp.lookup("#inputFieldName")).getText());
+                params.put("inputFieldValue", ((TextField) gp.lookup("#inputFieldValue")).getText());
+                params.put("format", ((ChoiceBox<String>) gp.lookup("#format")).getValue());
+                setParameters(params);
+            }
+
+        };
+           
+        actions = Arrays.asList(a100,a200,a210,a220,a230,a240);
+    }
+     
+    
+    public String wrapperMethodForGui(Map<String,String> parameters) {
         String out;
         try {
-            parseArguments(args);
-            String action = getActionName();
-            switch (action) {
-                case "orderSubscription":
-                    out = orderSubscription();
-                    break;
-                case "cancelSubscription":
-                    out = cancelSubscription();
-                    break;
-                case "viewSubscriptionDetails":
-                    out = viewSubscriptionDetails();
-                    break;
-                case "viewServiceForSubscription":
-                    out = viewServiceForSubscription();
-                    break;  
-                case "viewSubscriptionOrder":
-                    out = viewSubscriptionOrder();
-                    break;      
-                case "viewOfferingForSubscription":
-                    out = viewOfferingForSubscription();
-                    break; 
-                case "viewServiceComponentsProperties":
-                    out = viewServiceComponentsProperties();
-                    break;                     
-                case "getAvailableValues":
-                    out = getAvailableValues();
-                    break;
-                 case "viewRequestDetails":
-                    out = viewRequestDetails();
-                    break;
-                 case "viewSubscriptionErrorInfo":
-                    out = viewSubscriptionErrorInfo();
-                    break;
-                 case "updateComponentProperty":
-                    out = updateComponentProperty();
-                    break;
-                 case "updateProcessInstance":
-                    out = updateProcessInstance();
-                    break;
-                 case "generateToken":
-                    out = generateToken();
-                    break;   
-                default:
-                    out = "No method selected";
-            }
+            String action = parameters.get("action");
+            Method method = this.getClass().getMethod(action, java.util.Map.class);
+            out = (String) method.invoke(this, parameters);
         }
         catch(Exception e) {
             out = processException(e);
@@ -235,7 +387,8 @@ public class Subscription {
         configuration.put("csaPort", new Conf("TCP Port",Integer.toString(csaPort),"INT","plain"));  
         String csaProtocol = root.get("csaAS").get("Protocol").asText();
         configuration.put("csaProtocol", new Conf("Transport Protocol",csaProtocol,"STRING","plain")); 
-    } 
+    }
+    
     
     Map<String,Conf> getConfiguration() {
         return configuration;
@@ -736,17 +889,6 @@ public class Subscription {
         return out;
     }
     
-    String viewServiceInstanceDetails(String id) throws Exception {
-        String acceptContent = "application/json";
-        String uri = "/csa/api/mpp/mpp-instance/" + id;
-        String onBehalf = configuration.get("onBehalf").getValue();
-        uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
-        initCSAClient();
-        String token = requestToken();
-        screen.outputLog("requesting service instance details", true);
-        String output = csa.getHttp(token, null, null, uri, acceptContent);
-        return output;
-    }
     
     String viewSubscriptionErrorInfo() throws Exception {
         String subscriptionId = arguments.get("subscriptionId");
@@ -806,51 +948,7 @@ public class Subscription {
         return mapper.readTree(output).get("id").asText();
     }
     
-    public String getAvailableValues() throws Exception {
-        String result = "";
-        String fieldId = arguments.get("fieldId");
-        if (fieldId == null) raiseError("Argument field \"fieldId\" is empty");
-        boolean filter = (arguments.get("filter") == null)? false: Boolean.valueOf(arguments.get("filter"));
-
-        String inputFieldName = arguments.get("inputFieldName");
-        String inputFieldValue = arguments.get("inputFieldValue");
-        String fields = "";
-        if (inputFieldName != null && !inputFieldName.isEmpty() && inputFieldValue != null && !inputFieldValue.isEmpty())
-            fields = String.format("%s=%s", inputFieldName,inputFieldValue);
-        System.out.println(fields);
-        initCSAClient();
-        String userId = getUserId();
-        String uri = "/csa/rest/availablevalues/" + fieldId + "?userIdentifier=" + userId;
-        screen.outputLog("Getting a field available values", true);
-        String output = csa.postHttp(null, configuration.get("transportUser").getValue(), configuration.get("transportPassword").getValue(), uri, fields, "application/json", "application/json");
-        ObjectMapper mapper = new ObjectMapper();
-        if (filter) {
-            Iterator<JsonNode> availableValues = mapper.readTree(output).get("availableValues").elements();
-            while(availableValues.hasNext()) {
-                String memo = "";
-                JsonNode av = availableValues.next();
-                String description = av.get("description").asText();
-                String displayName = av.get("displayName").asText();
-                memo = String.format("Display Name: %s%nDescription: %s", displayName, description);
-                if ( av.get("value") != null ) {
-                    if (av.get("value").getNodeType() == JsonNodeType.STRING)
-                       memo = String.format("%s%nValue: \"%s\"%n", memo, av.get("value").asText());
-                    else if (av.get("value").getNodeType() == JsonNodeType.NUMBER)
-                       memo = String.format("%s%nValue: %d%n", memo, av.get("value").asInt()); 
-                    else if (av.get("value").getNodeType() == JsonNodeType.BOOLEAN)
-                        memo = String.format("%s%nValue: %s%n", memo, Boolean.toString(av.get("value").asBoolean()).toLowerCase());
-                }
-                else 
-                    memo = String.format("%s%nValue: %s%n", memo, "null");
-                result = result + memo;
-            }
-        }
-        else {
-            HashMap<String,Object> av = (HashMap<String,Object>) mapper.readValue(output, HashMap.class);
-            result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(av);
-        }
-        return result;
-    }
+    
 
     
     public String updateProcessInstance() throws Exception {
@@ -871,49 +969,79 @@ public class Subscription {
         return output;
     }
     
-    public String viewSubscriptionDetails() throws Exception {
-        String id = arguments.get("subscriptionId");
-        if (id == null) raiseError("Subscription \"id\" is null");
-        String api = arguments.get("apiName");
-
-        String output = viewSubscriptionDetails(id,api);
-        return output;
+    public String getAvailableValues(Map<String,String> args) throws Exception {
+        String fieldId = args.get("fieldId");
+        String format = args.get("format");
+        String inputFieldName = args.get("inputFieldName");
+        String inputFieldValue = args.get("inputFieldValue");
+        return getAvailableValues(fieldId,inputFieldName,inputFieldValue,format);
     }
     
-    String viewSubscriptionDetails(String id, String api) throws Exception {       
-        String uri;
-        String output = null;
-        String acceptContent = "application/json";
+    String getAvailableValues(String fieldId,String inputFieldName,String inputFieldValue, String format) throws Exception {
+        String result = "";
+        
+        String fields = "";
+        if (inputFieldName != null && !inputFieldName.isEmpty() && inputFieldValue != null && !inputFieldValue.isEmpty())
+            fields = String.format("%s=%s", inputFieldName,inputFieldValue);
         initCSAClient();
-        if (api.equalsIgnoreCase("service")) {
-            uri = "/csa/api/service/subscription/" + id;
-            String ac = "application/json";
-            screen.outputLog("Getting subscription details with service API", true);
-            output = csa.getHttp(null, configuration.get("csaAdmin").getValue(), configuration.get("csaAdminPassword").getValue(), uri, acceptContent);
+        String userId = getUserId();
+        String uri = "/csa/rest/availablevalues/" + fieldId + "?userIdentifier=" + userId;
+        screen.outputLog("Getting a field available values", true);
+        String output = csa.postHttp(null, configuration.get("transportUser").getValue(), configuration.get("transportPassword").getValue(), uri, fields, "application/json", "application/json");
+        ObjectMapper mapper = new ObjectMapper();
+        if (format.equalsIgnoreCase("short")) {
+            Iterator<JsonNode> availableValues = mapper.readTree(output).get("availableValues").elements();
+            while(availableValues.hasNext()) {
+                String memo = "";
+                JsonNode av = availableValues.next();
+                String description = av.get("description").asText();
+                String displayName = av.get("displayName").asText();
+                memo = String.format("Display Name: %s%nDescription: %s", displayName, description);
+                if ( av.get("value") != null ) {
+                    if (av.get("value").getNodeType() == JsonNodeType.STRING)
+                       memo = String.format("%s%nValue: \"%s\"%n", memo, av.get("value").asText());
+                    else if (av.get("value").getNodeType() == JsonNodeType.NUMBER)
+                       memo = String.format("%s%nValue: %d%n", memo, av.get("value").asInt()); 
+                    else if (av.get("value").getNodeType() == JsonNodeType.BOOLEAN)
+                        memo = String.format("%s%nValue: %s%n", memo, Boolean.toString(av.get("value").asBoolean()).toLowerCase());
+                }
+                else 
+                    memo = String.format("%s%nValue: %s%n", memo, "null");
+                result = result + memo;
+            }
         }
-        else {
-            uri = "/csa/api/mpp/mpp-subscription/" + id;
-            String onBehalf = configuration.get("onBehalf").getValue();
-            uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
-            String token = requestToken();
-            screen.outputLog("Getting subscription details with mpp API", true);
-            output = csa.getHttp(token, null, null, uri, acceptContent);
+        else if (format.equalsIgnoreCase("long")) {
+            HashMap<String,Object> av = (HashMap<String,Object>) mapper.readValue(output, HashMap.class);
+            result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(av);
         }
+        return result;
+    }
+    
+    public String printToken(Map<String,String> args) throws Exception {
+        String format = args.get("format");
+        String output = printToken(format);
         return output;
     }
     
-    String viewSubscriptionOrder() throws Exception {
-        String subscriptionId = arguments.get("subscriptionId");
-        if (subscriptionId == null) raiseError("Subscription \"subscriptionId\" is null");
-        String out = viewSubscriptionDetails(subscriptionId,"service");
+    String printToken(String format) throws Exception {
+        String out = null;
+        initCSAClient();
         ObjectMapper mapper = new ObjectMapper();
-        String oid = mapper.readTree(out).get("ext").get("XXXXX").asText();
-        return viewRequestDetails(oid);
+        screen.outputLog("requesting CSA token", true);
+        csa.requestToken(configuration.get("idmUser").getValue(), configuration.get("idmPassword").getValue(), configuration.get("csaConsumer").getValue(), configuration.get("csaConsumerPassword").getValue(), configuration.get("csaTenant").getValue());
+        String rtoken = csa.getRawToken();
+        if (format.equalsIgnoreCase("short")) {            
+            out = mapper.readTree(rtoken).get("token").get("id").asText();
+        }
+        else if (format.equalsIgnoreCase("long")) {
+            JsonNode jn = mapper.readTree(rtoken);
+            out = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(jn);
+        }
+        return out;
     }
     
-    
-    String viewRequestDetails() throws Exception {
-        String id = arguments.get("id");
+    public String viewRequestDetails(Map<String,String> args) throws Exception {
+        String id = args.get("requestId");
         if (id == null) raiseError("Request \"id\" is null");
         String output = viewRequestDetails(id);
         return output;
@@ -929,6 +1057,68 @@ public class Subscription {
         String out = csa.getHttp(token, null, null, uri, "application/json");
         return out;
     }
+    
+    public String viewServiceInstanceDetails(Map<String,String> args) throws Exception {
+        String id = args.get("serviceInstanceId");
+        if (id == null) throw new RuntimeException("service instance id is empty");
+        String output = viewServiceInstanceDetails(id);
+        return output;
+    }
+    
+    String viewServiceInstanceDetails(String id) throws Exception {
+        String acceptContent = "application/json";
+        String uri = "/csa/api/mpp/mpp-instance/" + id;
+        String onBehalf = configuration.get("onBehalf").getValue();
+        uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
+        initCSAClient();
+        String token = requestToken();
+        screen.outputLog("requesting service instance details", true);
+        String output = csa.getHttp(token, null, null, uri, acceptContent);
+        return output;
+    }
+    
+    //nucleus.dm.Subscription.viewSubscriptionDetails(java.util.HashMap)
+    public String viewSubscriptionDetails(Map<String,String> args) throws Exception {
+        String id = args.get("subscriptionId");
+        if (id == null) throw new RuntimeException("subscription id is empty");
+        String api = args.get("apiName");
+        String output = viewSubscriptionDetails(id,api);
+        return output;
+    }
+    
+    String viewSubscriptionDetails(String id, String api) throws Exception {       
+        String uri;
+        String output = null;
+        String acceptContent = "application/json";
+        initCSAClient();
+        if (api.equalsIgnoreCase("service")) {
+            uri = "/csa/api/service/subscription/" + id;
+            String ac = "application/json";
+            screen.outputLog("requesting subscription details with service API", true);
+            output = csa.getHttp(null, configuration.get("csaAdmin").getValue(), configuration.get("csaAdminPassword").getValue(), uri, acceptContent);
+        }
+        else {
+            uri = "/csa/api/mpp/mpp-subscription/" + id;
+            String onBehalf = configuration.get("onBehalf").getValue();
+            uri = (onBehalf != null && !onBehalf.isEmpty())? uri + "?onBehalf=" + onBehalf: uri;
+            String token = requestToken();
+            screen.outputLog("requesting subscription details with mpp API", true);
+            output = csa.getHttp(token, null, null, uri, acceptContent);
+        }
+        return output;
+    }
+    
+    String viewSubscriptionOrder() throws Exception {
+        String subscriptionId = arguments.get("subscriptionId");
+        if (subscriptionId == null) raiseError("Subscription \"subscriptionId\" is null");
+        String out = viewSubscriptionDetails(subscriptionId,"service");
+        ObjectMapper mapper = new ObjectMapper();
+        String oid = mapper.readTree(out).get("ext").get("XXXXX").asText();
+        return viewRequestDetails(oid);
+    }
+    
+    
+    
      
     String requestToken() throws Exception {
         String rtoken = csa.getRawToken();
@@ -942,28 +1132,14 @@ public class Subscription {
     }
     
     // 3 implement method
-    String generateToken() throws Exception {
-        initCSAClient();
-        ObjectMapper mapper = new ObjectMapper();
-        String format = arguments.get("format");
-        screen.outputLog("Requesting CSA Token", true);
-        csa.requestToken(configuration.get("idmUser").getValue(), configuration.get("idmPassword").getValue(), configuration.get("csaConsumer").getValue(), configuration.get("csaConsumerPassword").getValue(), configuration.get("csaTenant").getValue());
-        String rtoken = csa.getRawToken();
-        if (format.equalsIgnoreCase("short")) {            
-            return mapper.readTree(rtoken).get("token").get("id").asText();
-        }
-        else {
-            JsonNode jn = mapper.readTree(rtoken);
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(jn);
-        }
-    }
+    
     
     void clearToken() {
         if ( csa != null)
             csa.clearToken();
     }
     
-    private String processException(Throwable e) {
+    String processException(Throwable e) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
         PrintWriter pw = new PrintWriter(baos,true);
         e.printStackTrace(pw);
