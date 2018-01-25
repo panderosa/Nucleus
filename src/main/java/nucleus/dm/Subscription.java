@@ -114,11 +114,6 @@ public class Subscription {
         a700.addParameter("propertyVisibility", "Property Visibility, use true|false");
         a700.addParameter("propertyValue", "Property Value");
         
-        Action a800 = new Action("updateProcessInstance","Update Process Instance");
-        a800.addParameter("csaProcessId", "CSA Process Id");
-        a800.addParameter("processState", "State, e.g. COMPLETED...");
-        a800.addParameter("processReturnCode", "Return Code, e.g. SUCCESS, FAILURE");
-        a800.addParameter("processStatus", "Status Information");
         
         
         
@@ -172,7 +167,8 @@ public class Subscription {
                 ChoiceBox<String> cb = new ChoiceBox<>(FXCollections.observableArrayList("mpp","service"));
                 cb.setId("apiName");
                 // Set default Value
-                cb.setValue("mpp");               
+                cb.setValue("mpp");
+                cb.setMaxWidth(Double.MAX_VALUE);
                                
                 gp.addRow(1, label,field); 
                 gp.addRow(2, label1,cb);
@@ -255,7 +251,8 @@ public class Subscription {
                 cb.setId("format");
                 // Set default Value
                 cb.setValue("short"); 
-                                                             
+                cb.setMaxWidth(Double.MAX_VALUE);
+                
                 gp.addRow(1, label,cb); 
 
             }
@@ -295,7 +292,8 @@ public class Subscription {
                 ChoiceBox<String> cb = new ChoiceBox<>(FXCollections.observableArrayList("short","long"));
                 cb.setId("format");
                 // Set default Value
-                cb.setValue("short"); 
+                cb.setValue("short");
+                cb.setMaxWidth(Double.MAX_VALUE);
                                                              
                 gp.addRow(1, label,field); 
                 gp.addRow(2, label1,field1); 
@@ -316,8 +314,58 @@ public class Subscription {
             }
 
         };
-           
-        actions = Arrays.asList(a100,a200,a210,a220,a230,a240);
+        
+
+        Action a250 = new Action("updateProcessInstance","Update CSA Process Instance") {           
+         
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                children.remove(1, children.size());
+                
+                Label label = new Label("Process Instance Id");
+                TextField field = new TextField();
+                field.setPromptText("Enter process id");
+                field.setId("processInstanceId");
+                
+                Label label1 = new Label("Process Instance State");
+                ChoiceBox<String> cb1 = new ChoiceBox<>(FXCollections.observableArrayList("INITIALIZED","PENDING","READY","ACTIVE","COMPLETED","ERROR","CANCELED"));
+                cb1.setValue("COMPLETED");
+                cb1.setId("processInstanceState");
+                cb1.setMaxWidth(Double.MAX_VALUE);
+                
+                Label label2 = new Label("Return Code");
+                ChoiceBox<String> cb2 = new ChoiceBox<>(FXCollections.observableArrayList("SUCCESS","FAILURE","RUNNING","TIMEOUT"));
+                cb2.setValue("SUCCESS");
+                cb2.setId("processInstanceReturnCode");
+                cb2.setMaxWidth(Double.MAX_VALUE);
+                
+                Label label3 = new Label("Status");
+                TextField field3 = new TextField();
+                field3.setPromptText("Enter status information");
+                field3.setId("processInstanceStatus");
+                                                             
+                gp.addRow(1, label,field); 
+                gp.addRow(2, label1,cb1); 
+                gp.addRow(3, label2,cb2);
+                gp.addRow(4, label3,field3);
+                
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName()); 
+                params.put("processInstanceId", ((TextField) gp.lookup("#processInstanceId")).getText());
+                params.put("processInstanceState", ((ChoiceBox<String>) gp.lookup("#processInstanceState")).getValue());
+                params.put("processInstanceReturnCode", ((ChoiceBox<String>) gp.lookup("#processInstanceReturnCode")).getValue());
+                params.put("processInstanceStatus", ((TextField) gp.lookup("#processInstanceStatus")).getText());
+                setParameters(params);
+            }
+
+        };
+                 
+        actions = Arrays.asList(a100,a200,a210,a220,a230,a240,a250);
     }
      
     
@@ -942,24 +990,24 @@ public class Subscription {
     String getUserId() throws Exception {
         String ac = "application/json";
         String uri = "/csa/rest/login/" + configuration.get("csaAdminOrg").getValue() + "/" + configuration.get("csaAdmin").getValue() + "/";
-        screen.outputLog("Getting CSA User Id for REST", true);
+        screen.outputLog("Getting CSA user identifier for REST calls", true);
         String output = csa.getHttp(null, configuration.get("transportUser").getValue(), configuration.get("transportPassword").getValue(), uri, ac);
         ObjectMapper mapper = new ObjectMapper();        
         return mapper.readTree(output).get("id").asText();
     }
     
-    
+    public String updateProcessInstance(Map<String,String> args) throws Exception {
+        String processInstanceId = args.get("processInstanceId");
+        if (processInstanceId == null) throw new RuntimeException("Process Instance Id is empty");
+        String processInstanceState = args.get("processInstanceState");
+        String processInstanceReturnCode = args.get("processInstanceReturnCode");
+        String processInstanceStatus = args.get("processInstanceStatus");
+        if (processInstanceStatus == null) throw new RuntimeException("Process Instance Status is empty");
+        return updateProcessInstance(processInstanceId,processInstanceState,processInstanceReturnCode,processInstanceStatus);
+    }
 
     
-    public String updateProcessInstance() throws Exception {
-        String csaProcessId = arguments.get("csaProcessId");
-        if (csaProcessId == null) raiseError("Process Instance \"csaProcessId\" is null");
-        String processState = arguments.get("processState");
-        if (processState == null) raiseError("Process Instance \"processState\" is null. E.g. use COMPLETED.");
-        String processReturnCode = arguments.get("processReturnCode");
-        if (processReturnCode == null) raiseError("Process Instance \"processReturnCode\" is null. E.g. use [FAILURE|SUCCESS]");
-        String processStatus = arguments.get("processStatus");
-        if (processStatus == null) raiseError("Process Instance \"processStatus\" is null");
+    String updateProcessInstance(String csaProcessId, String processState, String processReturnCode, String processStatus) throws Exception {        
         initCSAClient();
         String userId = getUserId();
         String uri = "/csa/rest/processinstances/" + csaProcessId + "?userIdentifier=" + userId + "&scope=view&view=processinstancestate&action=merge";	

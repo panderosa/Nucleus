@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -130,32 +132,23 @@ public class Screen extends Application {
         Button button4 = new Button("Clear Token");
         button4.setPrefSize(150, 20);
         
-        /*button2.setOnAction(e->{
-            String[] msg = processParameters();
-            String out = sub.wrapperMethodForGui(msg);
-            outputText(out);
-            //String txt = sub.wrapperMethod(msg);
-            //AlertBox.display(msg);
-        });*/
         button2.setOnAction(e->{
-            try {
                 Task task = new Task<Void>() {
                     @Override
                     public Void call() throws Exception {
-                        currentAction.getParameters(parametersPane);
-                        String out = currentAction.runAction(sub);
-                        outputText(out);
+                        try {
+                            currentAction.getParameters(parametersPane);
+                            String out = currentAction.runAction(sub);
+                            outputText(out);
+                        }
+                        catch(Exception exp) {
+                            String out = processException(exp);
+                            outputLog(out, true);
+                        }
                         return null;
                     }
                 };
                 new Thread(task).start();
-            }
-            catch(Exception exp) {
-                String out = processException(exp);
-                this.outputLog(out, true);
-            }
-            //String txt = sub.wrapperMethod(msg);
-            //AlertBox.display(msg);
         });
         
         button3.setOnAction(e->{
@@ -174,29 +167,6 @@ public class Screen extends Application {
         hbox.getChildren().addAll(button1,button2,button3,button4);
         return hbox;
     }
-    
-    /*String[] processParameters() {
-        List<String> params = new ArrayList<>();
-        params.add(String.format("action=%s", currentAction.getName()));       
-        Iterator<Entry<String,String>> p = currentAction.getParameters().entrySet().iterator();        
-        while(p.hasNext()) {
-            Entry<String,String> pe = p.next();
-            String ni = pe.getKey();
-            System.out.println(ni);
-            TextField tf = (TextField) parametersPane.lookup("#"+ni);
-            if (tf != null) {
-                params.add(String.format("%s=%s", ni,tf.getText()));
-            }
-           
-        }
-        String[] strArr = null;
-        strArr = params.toArray(new String[params.size()]);
-        return strArr;
-    }*/
-    
-    /*String[] processParameters() {
-        return currentAction.collectParameters(parametersPane);
-    }*/
     
     
     public VBox addActionsPane() {
@@ -250,26 +220,12 @@ public class Screen extends Application {
         title.getStyleClass().add("title");
         GridPane.setConstraints(title, 0, 0, 2, 1);
         pp.getChildren().add(0, title);
-        pp.setPrefWidth(400);
+        ColumnConstraints column1 = new ColumnConstraints(150);
+        ColumnConstraints column2 = new ColumnConstraints(200);
+        pp.getColumnConstraints().addAll(column1,column2);
         pp.setAlignment(Pos.TOP_CENTER);
         return pp;
     }
-    
-    /*public void updateParametersPane(Action a) {
-        ObservableList<Node> children = parametersPane.getChildren();                
-        children.remove(1, children.size());          
-        int i = 1;
-        Iterator<Entry<String,String>> as = a.getParameters().entrySet().iterator();
-        while(as.hasNext()) {
-            Entry<String,String> item = as.next();
-            Label label = new Label(item.getValue());
-            TextField field = new TextField();
-            field.setId(item.getKey());
-            //field.setPromptText(item.getValue());
-            parametersPane.addRow(i, label,field);
-            i++;
-        }
-    }*/
     
     public void updateParametersPane(Action a) {
         a.buildMyPane(parametersPane, window);
@@ -285,8 +241,10 @@ public class Screen extends Application {
         title.getStyleClass().add("title");
         GridPane.setConstraints(title, 0, 0, 2, 1);
         cp.getChildren().add(0, title);
+        ColumnConstraints column1 = new ColumnConstraints(150);
+        ColumnConstraints column2 = new ColumnConstraints(200);
+        cp.getColumnConstraints().addAll(column1,column2);
         cp.setAlignment(Pos.TOP_CENTER);
-        cp.setPrefWidth(500);
         return cp;
     }
     
@@ -345,8 +303,9 @@ public class Screen extends Application {
         hbox.setPadding(new Insets(5));
         Button bclearL = new Button("Clear Log");
         Button bclearO = new Button("Clear Output");
+        Button bsave = new Button("Save to file");
         Button testMe = new Button("testMe");
-        hbox.getChildren().addAll(bclearL,bclearO,testMe);
+        hbox.getChildren().addAll(bclearL,bclearO,bsave,testMe);
         
         bclearL.setOnAction(e->{
             logArea.clear();
@@ -354,6 +313,22 @@ public class Screen extends Application {
         
         bclearO.setOnAction(e->{
             outputArea.clear();
+        });
+        
+        bsave.setOnAction(e->{           
+            FileChooser fc = new FileChooser();
+            File file = fc.showSaveDialog(window);
+            try {
+                if (file != null) {
+                    String out = getOutput();
+                    FileWriter fw = new FileWriter(file);
+                    fw.write(out);
+                    fw.close();
+                }
+            }
+            catch(Exception exp) {
+                outputLog(processException(exp),true);
+            }
         });
         
         testMe.setOnAction(e->{
@@ -418,6 +393,9 @@ public class Screen extends Application {
         logArea.appendText("\n");
     }
     
+    String getOutput() {
+        return outputArea.getText();
+    }
     
     void outputText(String txt) {        
         outputArea.appendText(txt);
