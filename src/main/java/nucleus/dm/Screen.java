@@ -6,6 +6,7 @@
 package nucleus.dm;
 
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
@@ -13,13 +14,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -27,17 +23,13 @@ import javafx.concurrent.Task;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
-import javafx.scene.control.ScrollBar;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -49,13 +41,8 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-import jxl.format.Border;
 
 
-/**
- *
- * @author Administrator
- */
 public class Screen extends Application {
     
     private Stage window;
@@ -70,7 +57,7 @@ public class Screen extends Application {
     private TextArea outputArea;
     private TextArea logArea;
     Action currentAction;
-    private Map<String,Conf> currentConfiguration;
+    private Configuration configuration;
     
     public static void main(String[] args) {
         launch();
@@ -104,10 +91,16 @@ public class Screen extends Application {
         button1.setOnAction(e->{
             File file = fileChooser.showOpenDialog(window);
             if (file != null) {
-                String txt = sub.readConfiguration(file);
-                currentConfiguration = sub.getConfiguration();
-                updateConfigurationPane();
-                outputText(txt);  
+                /*String txt = sub.readConfiguration(file);
+                configuration = sub.getConfiguration();*/
+                try {
+                    sub.setupConfiguration(file);
+                    configuration = sub.getConfiguration();
+                    updateConfigurationPane();
+                }
+                catch(Exception exp) {
+                    outputLog(processException(exp),true);
+                }
             }                    
         });
         
@@ -192,11 +185,10 @@ public class Screen extends Application {
             };
         });
         
-        actionlist.getSelectionModel().selectedItemProperty().addListener((ob,oldAction,newAction)->{
+        actionlist.getSelectionModel().selectedItemProperty().addListener((ob,oa,na)->{
             //System.out.println(newAction);
-            currentAction = newAction;
-            updateParametersPane(newAction);
-
+            currentAction = na;
+            na.buildMyPane(parametersPane, window);
         }); 
         
         VBox.setMargin(title, new Insets(5));
@@ -227,10 +219,6 @@ public class Screen extends Application {
         return pp;
     }
     
-    public void updateParametersPane(Action a) {
-        a.buildMyPane(parametersPane, window);
-    }
-    
     public GridPane addConfigurationPane() {
         GridPane cp = new GridPane();
         cp.setPadding(new Insets(10));
@@ -244,39 +232,87 @@ public class Screen extends Application {
         ColumnConstraints column1 = new ColumnConstraints(150);
         ColumnConstraints column2 = new ColumnConstraints(200);
         cp.getColumnConstraints().addAll(column1,column2);
-        cp.setAlignment(Pos.TOP_CENTER);
-        return cp;
-    }
-    
-    public void updateConfigurationPane() {
-        ObservableList<Node> children = configurationPane.getChildren();
-        children.remove(1, children.size());
-        int i = 1;
-        Iterator<String> keys = currentConfiguration.keySet().iterator();
-        while(keys.hasNext()) {
-            String key = keys.next();
-            Conf item = currentConfiguration.get(key);
-            Label label = new Label(item.getDisplayName());
-            if (item.getGuiType().equalsIgnoreCase("plain")) {
-                TextField field = new TextField();
-                field.setId(key);
-                field.setText(item.getValue());
-                configurationPane.addRow(i, label,field);
-            }
-            else if (item.getGuiType().equalsIgnoreCase("hidden")) {
-                PasswordField pw = new PasswordField();
-                pw.setId(key);
-                pw.setText(item.getValue());
-                configurationPane.addRow(i, label,pw);
-            }
-            i++;
-        }
-        Button button = new Button("Apply");
-        GridPane.setHalignment(button, HPos.RIGHT);
-        configurationPane.add(button, 1, i);
         
-        button.setOnAction( v -> {
-            currentConfiguration.forEach((id,cf)->{
+        Label label1 = new Label("IDM Transport User");
+        TextField field1 = new TextField();
+        field1.setId("csaIdmUser");
+        cp.addRow(1, label1,field1);
+        
+        Label label2 = new Label("IDM User Password");
+        PasswordField pf2 = new PasswordField();
+        pf2.setId("csaIdmPassword");
+        cp.addRow(2, label2,pf2);
+        
+        Label label3 = new Label("CSA Transport User");
+        TextField field3 = new TextField();
+        field3.setId("csaTransportUser");
+        cp.addRow(3, label3,field3); 
+
+        Label label4 = new Label("Transport User Password");
+        PasswordField pf4 = new PasswordField();
+        pf4.setId("csaTransportPassword");
+        cp.addRow(4, label4,pf4);
+        
+        Label label5 = new Label("CSA Default Consumer");
+        TextField field5 = new TextField();
+        field5.setId("csaConsumer");
+        cp.addRow(5, label5,field5); 
+
+        Label label6 = new Label("CSA Consumer Password");
+        PasswordField pf6 = new PasswordField();
+        pf6.setId("csaConsumerPassword");
+        cp.addRow(6, label6,pf6);
+        
+        Label label7 = new Label("CSA Consumer Tenant");
+        TextField field7 = new TextField();
+        field7.setId("csaConsumerTenant");
+        cp.addRow(7, label7,field7);
+        
+        Label label8 = new Label("Manage OnBehalf User");
+        TextField field8 = new TextField();
+        field8.setId("csaOnBehalfConsumer");
+        cp.addRow(8, label8,field8);
+        
+        Label label9 = new Label("CSA Administrator");
+        TextField field9 = new TextField();
+        field9.setId("csaAdminUser");
+        cp.addRow(9, label9,field9); 
+
+        Label label10 = new Label("CSA Administrator Password");
+        PasswordField pf10 = new PasswordField();
+        pf10.setId("csaAdminPassword");
+        cp.addRow(10, label10,pf10);
+        
+        Label label11 = new Label("CSA Provider Org");
+        TextField field11 = new TextField();
+        field11.setId("csaProviderOrg");
+        cp.addRow(11, label11,field11); 
+
+        Label label12 = new Label("CSA Server");
+        TextField field12 = new TextField();
+        field12.setId("csaServer");
+        cp.addRow(12, label12,field12); 
+        
+        Label label13 = new Label("CSA Transport Protocol");
+        TextField field13 = new TextField();
+        field13.setId("csaProtocol");
+        cp.addRow(13, label13,field13); 
+        
+        Label label14 = new Label("CSA TCP Port");
+        TextField field14 = new TextField();
+        field14.setId("csaPort");
+        cp.addRow(14, label14,field14);
+        
+        Button button = new Button("Apply");
+        button.setId("apply");
+        GridPane.setHalignment(button, HPos.RIGHT);
+        cp.add(button, 1, 15);
+        //button.setDisable(true);
+        
+        cp.setAlignment(Pos.TOP_CENTER);
+        
+        /*button.setOnAction( v -> {
+            configuration.forEach((id,cf)->{
                 String value = "";
                 Node node = configurationPane.lookup("#"+id);
                 if (node != null) {
@@ -289,11 +325,66 @@ public class Screen extends Application {
                         System.out.println(value);
                     }
                     cf.setValue(value);
-                    currentConfiguration.put(id, cf);
+                    configuration.put(id, cf);
                 }
             });
-            sub.setConfiguration(currentConfiguration);
-        });
+            sub.setConfiguration(configuration);
+        });*/
+        
+        return cp;
+    }
+    
+    public void updateConfigurationPane() {
+        ObservableList<Node> lista = configurationPane.getChildren();
+        for(Node item: lista) {
+            if(item.getId() != null) {
+                switch (item.getId()) {
+                    case "csaIdmUser":
+                        ((TextField) item).setText(configuration.getCsaIdmUser());
+                        break;
+                    case "csaIdmPassword":
+                        ((PasswordField) item).setText(configuration.getCsaIdmPassword());
+                        break;
+                    case "csaTransportUser": 
+                        ((TextField) item).setText(configuration.getCsaTransportUser());
+                        break;
+                    case "csaTransportPassword":
+                        ((PasswordField) item).setText(configuration.getCsaTransportPassword());
+                        break;
+                    case "csaConsumer": 
+                        ((TextField) item).setText(configuration.getCsaConsumer());
+                        break;
+                    case "csaConsumerPassword":
+                        ((PasswordField) item).setText(configuration.getCsaConsumerPassword());
+                        break;  
+                    case "csaConsumerTenant": 
+                        ((TextField) item).setText(configuration.getCsaConsumerTenant());
+                        break;    
+                    case "csaOnBehalfConsumer": 
+                        ((TextField) item).setText(configuration.getCsaOnBehalfConsumer());
+                        break;      
+                    case "csaAdminUser": 
+                        ((TextField) item).setText(configuration.getCsaAdminUser());
+                        break;
+                    case "csaAdminPassword":
+                        ((PasswordField) item).setText(configuration.getCsaAdminPassword());
+                        break; 
+                    case "csaProviderOrg": 
+                        ((TextField) item).setText(configuration.getCsaProviderOrg());
+                        break;
+                    case "csaServer": 
+                        ((TextField) item).setText(configuration.getCsaServer());
+                        break;
+                    case "csaProtocol": 
+                        ((TextField) item).setText(configuration.getCsaProtocol());
+                        break; 
+                    case "csaPort": 
+                        ((TextField) item).setText(Integer.toString(configuration.getCsaPort()));
+                        break;     
+                        
+                }
+            }
+        }
     }
     
     
@@ -332,19 +423,21 @@ public class Screen extends Application {
         });
         
         testMe.setOnAction(e->{
-            StringBuilder sb = new StringBuilder();
-            Method[] methods = sub.getClass().getMethods();
-            for (Method method: methods) {
-                String line;
-                String name = method.getName();
-                line = name;
-                Class[] parameters = method.getParameterTypes();
-                for(Class parameter: parameters) {
-                    String mn = parameter.getName();
-                    line = String.format("%s %s", line, mn);
+            try {
+                StringBuilder sb = new StringBuilder();
+                ObservableList<Node> lista = configurationPane.getChildren();
+                for(Node item: lista) {
+                    if(item.getId() != null && item.getId().equalsIgnoreCase("csaIdmUser")) {
+                        outputText(item.getId()+"\n");
+                        ((TextField) item).setText("dupa");
+                    }
                 }
-                line = line + "\n";
-                this.outputText(line);
+                ((TextField) configurationPane.lookup("csaIdmUser")).setText("maniek");
+                //csaIdmUser
+                
+            }
+            catch(Exception exp) {
+                outputLog(processException(exp),true);
             }
         });
         
