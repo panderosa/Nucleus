@@ -5,6 +5,9 @@
  */
 package nucleus.dm;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
+
 /**
  *
  * @author Administrator
@@ -41,9 +44,14 @@ public class Configuration {
         return csaIdmPassword;
     }
 
-    public void setCsaIdmPassword(String csaIdmPassword) throws Exception {
-        Decryptor decryptor = new Decryptor();
-        this.csaIdmPassword = decryptor.decryptPassword(csaIdmPassword);
+    public void setCsaIdmPassword(String csaIdmPassword) {
+        try {
+            Decryptor decryptor = new Decryptor();
+            this.csaIdmPassword = decryptor.decryptPassword(csaIdmPassword);
+        }
+        catch(Exception exp) {
+            System.out.println(processException(exp));
+        }
     }
 
     public String getCsaTransportUser() {
@@ -58,9 +66,14 @@ public class Configuration {
         return csaTransportPassword;
     }
 
-    public void setCsaTransportPassword(String csaTransportPassword) throws Exception {
-        Decryptor decryptor = new Decryptor();      
-        this.csaTransportPassword = decryptor.decryptPassword(csaTransportPassword);
+    public void setCsaTransportPassword(String csaTransportPassword) {
+        try {
+            Decryptor decryptor = new Decryptor();
+            this.csaTransportPassword = decryptor.decryptPassword(csaTransportPassword);
+        }
+        catch(Exception exp) {
+            System.out.println(processException(exp));
+        }
     }
 
     public String getCsaConsumer() {
@@ -75,9 +88,14 @@ public class Configuration {
         return csaConsumerPassword;
     }
 
-    public void setCsaConsumerPassword(String csaConsumerPassword) throws Exception {
-        Decryptor decryptor = new Decryptor();        
-        this.csaConsumerPassword = decryptor.decryptPassword(csaConsumerPassword);
+    public void setCsaConsumerPassword(String csaConsumerPassword) {
+        try {
+            Decryptor decryptor = new Decryptor();
+            this.csaConsumerPassword = decryptor.decryptPassword(csaConsumerPassword);
+        }
+        catch(Exception exp) {
+            System.out.println(processException(exp));
+        }
     }
 
     public String getCsaConsumerTenant() {
@@ -108,9 +126,14 @@ public class Configuration {
         return csaAdminPassword;
     }
 
-    public void setCsaAdminPassword(String csaAdminPassword) throws Exception {
-        Decryptor decryptor = new Decryptor(); 
-        this.csaAdminPassword = decryptor.decryptPassword(csaAdminPassword);
+    public void setCsaAdminPassword(String csaAdminPassword) {
+        try {
+            Decryptor decryptor = new Decryptor();
+            this.csaAdminPassword = decryptor.decryptPassword(csaAdminPassword);
+        }
+        catch(Exception exp) {
+            System.out.println(processException(exp));
+        }
     }
 
     public String getCsaProviderOrg() {
@@ -145,6 +168,32 @@ public class Configuration {
         this.csaPort = csaPort;
     }
     
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("csaIdmUser: ").append(csaIdmUser).append("\n");
+        sb.append("csaIdmPassword: ").append(csaIdmPassword).append("\n");
+        sb.append("csaTransportUser: ").append(csaTransportUser).append("\n");
+        sb.append("csaTransportPassword: ").append(csaTransportPassword).append("\n");
+        sb.append("csaConsumer: ").append(csaConsumer).append("\n");
+        sb.append("csaConsumerPassword: ").append(csaConsumerPassword).append("\n");
+        sb.append("csaConsumerTenant: ").append(csaConsumerTenant).append("\n");
+        sb.append("csaOnBehalfConsumer: ").append(csaOnBehalfConsumer).append("\n");
+        sb.append("csaAdminUser: ").append(csaAdminUser).append("\n");
+        sb.append("csaAdminPassword: ").append(csaAdminPassword).append("\n");
+        sb.append("csaProviderOrg: ").append(csaProviderOrg).append("\n");
+        sb.append("csaServer: ").append(csaServer).append("\n");
+        sb.append("csaProtocol: ").append(csaProtocol).append("\n");
+        sb.append("csaPort: ").append(csaPort).append("\n");
+        return(sb.toString());   
+    }
     
+    String processException(Throwable e) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
+        PrintWriter pw = new PrintWriter(baos,true);
+        e.printStackTrace(pw);
+        String out = baos.toString();
+        return out;
+    }
     
 }
