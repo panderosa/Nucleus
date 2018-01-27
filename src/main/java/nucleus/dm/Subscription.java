@@ -32,6 +32,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.concurrent.Task;
+import javafx.geometry.HPos;
 import javafx.scene.DepthTest;
 import javafx.scene.Node;
 import javafx.scene.control.ChoiceBox;
@@ -174,6 +175,22 @@ public class Subscription {
                 cb.setMaxWidth(Double.MAX_VALUE);
                 cb.setDisable(true);
                 
+                
+                ToggleGroup group = new ToggleGroup();               
+                RadioButton rb1 = new RadioButton("Plain View");
+                rb1.setUserData("plain");
+                rb1.setSelected(true);
+                GridPane.setConstraints(rb1, 1, 2);
+                GridPane.setHalignment(rb1, HPos.LEFT);
+                RadioButton rb2 = new RadioButton("Table View");
+                rb2.setUserData("table");
+                GridPane.setConstraints(rb2, 1, 2);
+                GridPane.setHalignment(rb2, HPos.RIGHT);
+                group.getToggles().addAll(rb1,rb2);
+                
+                gp.addRow(1, label,cb);
+                gp.getChildren().addAll(rb1,rb2);
+                
                 //cb.setItems(getCSAOrganizations());
                 Task task = new Task<Void>() {
                     @Override
@@ -204,8 +221,17 @@ public class Subscription {
                 cb.getSelectionModel().selectedItemProperty().addListener((ob,oo,no)->{
                     selected = ((Organization) no).getId();
                 });
+                
+                group.selectedToggleProperty().addListener((ob,ov,nv)-> {
+                    if(((String)nv.getUserData()).equalsIgnoreCase("table")) {
+                        
+                    }
+                    else if(((String)nv.getUserData()).equalsIgnoreCase("plain")) {
+                        
+                    }
+                });
                                
-                gp.addRow(1, label,cb); 
+                
             }
             
             @Override

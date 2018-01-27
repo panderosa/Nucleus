@@ -31,6 +31,8 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.SelectionMode;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
@@ -53,7 +55,8 @@ public class Screen extends Application {
     private GridPane parametersPane;
     private GridPane configurationPane;
     private BorderPane outputPane;
-    private TextArea outputArea;
+    private TextArea outputArea = null;
+    private TableView table = null;
     private TextArea logArea;
     Action currentAction;
     
@@ -67,6 +70,7 @@ public class Screen extends Application {
         observableActions = FXCollections.observableArrayList(sub.getActions());   
     }
     
+   
     @Override
     public void start(Stage stage) throws Exception {
         window = stage;
@@ -467,8 +471,7 @@ public class Screen extends Application {
         
         testMe.setOnAction(e->{
             try {
-                Configuration configuration = sub.getConfiguration();
-                outputText(configuration.toString());
+                switchOutput();
             }
             catch(Exception exp) {
                 outputLog(processException(exp),true);
@@ -476,30 +479,54 @@ public class Screen extends Application {
         });
         
         VBox vbox = new VBox();
+        vbox.setId("output");
         vbox.setPadding(new Insets(5)); 
         
         logArea = new TextArea();
+        logArea.setId("log");
         logArea.getStyleClass().add("log-area");
-        
-        outputArea = new TextArea();
+
+        outputArea = new TextArea();    
         outputArea.setPrefWidth(800);
         outputArea.setPrefHeight(400);
         outputArea.setWrapText(true);
         outputArea.setEditable(false);
+        outputArea.setId("text");
         outputArea.getStyleClass().add("outputArea");
-        //outputArea.setMaxWidth(2000);
-        
-        vbox.getChildren().addAll(logArea,outputArea);
-        
-        
         outputArea.textProperty().addListener((o,oldv,newv)->{
             outputArea.setScrollTop(Double.MIN_VALUE);
         });
+        
+        vbox.getChildren().add(0, logArea);
+        vbox.getChildren().add(1, outputArea); 
         
         bp.setTop(hbox);
         bp.setCenter(vbox);
         return bp;
     }
+    
+    void addTableView() {
+        table = new TableView();
+        TableColumn tc01 = new TableColumn("User Name");
+        TableColumn tc02 = new TableColumn("Status");
+        TableColumn tc03 = new TableColumn("Name");
+        table.getColumns().addAll(tc01,tc02,tc03);
+        table.setPrefWidth(800);    
+    }
+    
+    void switchOutput() {
+       ObservableList<Node> children = ((VBox) outputPane.lookup("#output")).getChildren();
+       if (children.get(1).getClass().toString().equalsIgnoreCase("class javafx.scene.control.TextArea")) {
+           children.remove(1);
+           addTableView();
+           children.add(1, table);
+       }
+       else {
+           children.remove(1);
+           children.add(1, outputArea);
+       }
+    }
+    
     
     private String processException(Throwable e) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
