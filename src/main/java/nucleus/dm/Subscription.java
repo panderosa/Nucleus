@@ -161,6 +161,7 @@ public class Subscription {
         
         Action a150 = new Action("listSubscriptionsByUserInOrganization","List Subscriptions For CSA Organization") {           
             String selected;
+            String format;
             
             @Override
             public void buildMyPane(GridPane gp, Stage stage) {
@@ -224,10 +225,10 @@ public class Subscription {
                 
                 group.selectedToggleProperty().addListener((ob,ov,nv)-> {
                     if(((String)nv.getUserData()).equalsIgnoreCase("table")) {
-                        
+                        format = "table";
                     }
                     else if(((String)nv.getUserData()).equalsIgnoreCase("plain")) {
-                        
+                        format = "plain";
                     }
                 });
                                
@@ -239,7 +240,7 @@ public class Subscription {
                 Map<String,String> params = new HashMap<>();
                 params.put("action", getName());       
                 params.put("organizationId", selected);
-                
+                params.put("format", format);
                 setParameters(params);
             }
 
@@ -1363,12 +1364,13 @@ public class Subscription {
     public String listSubscriptionsByUserInOrganization(Map<String,String> args) throws Exception {
         String organizationId = args.get("organizationId");
         if (organizationId == null) throw new RuntimeException("Organization Id is empty");
-        screen.outputLog("Select Organization Id: " + organizationId, true);
-        String output = listSubscriptionsByUserInOrganization(organizationId);
+        String format = args.get("format");
+        screen.outputLog("Selected Organization Id: " + organizationId, true);
+        String output = listSubscriptionsByUserInOrganization(organizationId,format);
         return output;
     }
     
-    String listSubscriptionsByUserInOrganization(String id) throws Exception {
+    String listSubscriptionsByUserInOrganization(String id,String format) throws Exception {
         initCSAClient();
   
         String uri = "/csa/api/person/organization/" + id + "?start-index=0&page-size=30&sort=userName:ascending";
