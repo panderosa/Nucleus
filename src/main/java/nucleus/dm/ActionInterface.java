@@ -16,5 +16,5 @@ import javafx.stage.Stage;
 interface ActionInterface {
     public void buildMyPane(GridPane gp, Stage stage);
     public void getParameters(GridPane gp) throws Exception;
-    public String runAction(Subscription ss);
+    public void runAction(Subscription ss) throws Exception;
 }

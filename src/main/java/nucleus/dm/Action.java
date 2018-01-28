@@ -70,15 +70,8 @@ public class Action implements ActionInterface {
     }
 
     @Override
-    public String runAction(Subscription ss) {
-        String out = null;
-        try {
-            out = ss.wrapperMethodForGui(parameters);
-        }
-        catch(Exception e) {
-            out = processException(e);
-        };
-        return out;
+    public void runAction(Subscription ss) throws Exception {
+        ss.wrapperMethodForGui(parameters);
     }
     
 }

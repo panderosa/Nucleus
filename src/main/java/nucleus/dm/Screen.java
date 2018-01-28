@@ -61,7 +61,7 @@ public class Screen extends Application {
     Action currentAction;
     
     public static void main(String[] args) {
-        launch();
+        launch(args);
     }
     
     @Override
@@ -116,8 +116,7 @@ public class Screen extends Application {
                     public Void call() throws Exception {
                         try {
                             currentAction.getParameters(parametersPane);
-                            String out = currentAction.runAction(sub);
-                            outputText(out);
+                            currentAction.runAction(sub);
                         }
                         catch(Exception exp) {
                             String out = processException(exp);
@@ -470,12 +469,7 @@ public class Screen extends Application {
         });
         
         testMe.setOnAction(e->{
-            try {
-                switchOutput();
-            }
-            catch(Exception exp) {
-                outputLog(processException(exp),true);
-            }
+           
         });
         
         VBox vbox = new VBox();
@@ -505,26 +499,45 @@ public class Screen extends Application {
         return bp;
     }
     
-    void addTableView() {
-        table = new TableView();
-        TableColumn tc01 = new TableColumn("User Name");
-        TableColumn tc02 = new TableColumn("Status");
-        TableColumn tc03 = new TableColumn("Name");
-        table.getColumns().addAll(tc01,tc02,tc03);
-        table.setPrefWidth(800);    
+    
+    void setTableView(TableView table) {
+        this.table = table;  
     }
     
-    void switchOutput() {
-       ObservableList<Node> children = ((VBox) outputPane.lookup("#output")).getChildren();
-       if (children.get(1).getClass().toString().equalsIgnoreCase("class javafx.scene.control.TextArea")) {
-           children.remove(1);
-           addTableView();
-           children.add(1, table);
+    void switchOutput(String format) {
+        ObservableList<Node> children = ((VBox) outputPane.lookup("#output")).getChildren();
+        children.remove(1);
+        switch(format) {
+            case "table":
+                children.add(1, table);
+                break;
+           case "plain":
+                children.add(1, outputArea);
+               break;
        }
-       else {
-           children.remove(1);
-           children.add(1, outputArea);
-       }
+    }
+    
+    void setToPlain() {
+        ObservableList<Node> children = ((VBox) outputPane.lookup("#output")).getChildren();
+        if(!children.get(1).getClass().toString().equalsIgnoreCase("javafx.scene.control.TextArea")) {
+            children.remove(1);
+            TextArea ta = new TextArea();    
+            ta.setPrefWidth(800);
+            ta.setPrefHeight(400);
+            ta.setWrapText(true);
+            ta.setEditable(false);
+            ta.setId("text");
+            ta.getStyleClass().add("outputArea");
+            ta.textProperty().addListener((o,oldv,newv)->{
+                ta.setScrollTop(Double.MIN_VALUE);
+            });
+            outputArea = ta;
+            children.add(1, outputArea);
+        }
+    }
+     
+    void fillTable(ObservableList<PersonSubscriptions> data) {
+        table.setItems(data);
     }
     
     

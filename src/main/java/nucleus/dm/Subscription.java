@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
@@ -41,8 +42,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -103,15 +107,8 @@ public class Subscription {
         Action a230 = new Action("viewOfferingForSubscription","View Service Offering For Subscription");
         a230.addParameter("subscriptionId", "Subscription Id");
         
-        
-
-        
-
-        
         Action a500 = new Action("viewSubscriptionErrorInfo","View Subscription Error Info");
         a500.addParameter("subscriptionId", "Subscription Id");
-        
-        
         
         Action a700 = new Action("updateComponentProperty","Update Components Property Value");
         a700.addParameter("componentId", "Service Component Id");
@@ -120,10 +117,7 @@ public class Subscription {
         a700.addParameter("propertyValueType", "Property Value Type");
         a700.addParameter("propertyVisibility", "Property Visibility, use true|false");
         a700.addParameter("propertyValue", "Property Value");
-        
-        
-        
-        
+
         actions = Arrays.asList(a100,a110,a200,a210,a220,a230,a240,a300,a400,a500,a600,a700,a800,a900);   
     }*/
     
@@ -146,7 +140,9 @@ public class Subscription {
                     File file = fc.showOpenDialog(stage);
                     field.setText(file.getAbsolutePath());
                 });                
-                gp.addRow(1, label,field);                
+                gp.addRow(1, label,field);    
+                
+                screen.setToPlain();
             }
             
             @Override
@@ -162,6 +158,7 @@ public class Subscription {
         Action a150 = new Action("listSubscriptionsByUserInOrganization","List Subscriptions For CSA Organization") {           
             String selected;
             String format;
+            TableView table = null;
             
             @Override
             public void buildMyPane(GridPane gp, Stage stage) {
@@ -191,6 +188,8 @@ public class Subscription {
                 
                 gp.addRow(1, label,cb);
                 gp.getChildren().addAll(rb1,rb2);
+                
+                screen.setToPlain();
                 
                 //cb.setItems(getCSAOrganizations());
                 Task task = new Task<Void>() {
@@ -224,16 +223,48 @@ public class Subscription {
                 });
                 
                 group.selectedToggleProperty().addListener((ob,ov,nv)-> {
-                    if(((String)nv.getUserData()).equalsIgnoreCase("table")) {
-                        format = "table";
-                    }
-                    else if(((String)nv.getUserData()).equalsIgnoreCase("plain")) {
-                        format = "plain";
+                    String frm = (String)nv.getUserData();
+                    switch(frm) {
+                        case "table":                            
+                            if (table == null) {
+                                table = formatTable();
+                                screen.setTableView(table); 
+                            }                     
+                            screen.switchOutput("table");
+                            format = "table";
+                            break;
+                        case "plain":
+                            screen.switchOutput("plain");
+                            format = "plain";
+                            break;
                     }
                 });
-                               
-                
+   
             }
+            
+            TableView formatTable() {
+                TableView table = new TableView();
+                TableColumn tc01 = new TableColumn("User Name");
+                tc01.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("userName"));
+                TableColumn tc02 = new TableColumn("# Active");
+                tc02.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("activeSubscription"));
+                TableColumn tc03 = new TableColumn("# Pending");
+                tc03.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("pendingSubscription"));
+                TableColumn tc04 = new TableColumn("# Paused");
+                tc04.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("pausedSubscription"));
+                TableColumn tc05 = new TableColumn("# Cancelled");
+                tc05.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("cancelledSubscription"));
+                TableColumn tc06 = new TableColumn("# Expired");
+                tc06.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("expiredSubscription"));
+                TableColumn tc07 = new TableColumn("# Terminated");
+                tc07.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("terminatedSubscription"));
+                TableColumn tc08 = new TableColumn("# Pending Requests");
+                tc08.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("pendingRequest"));
+                table.getColumns().addAll(tc01,tc02,tc03,tc04,tc05,tc06,tc07,tc08);
+                table.setPrefWidth(800);  
+                return table;
+            }
+            
             
             @Override
             public void getParameters(GridPane gp) throws Exception {
@@ -266,6 +297,8 @@ public class Subscription {
                                
                 gp.addRow(1, label,field); 
                 gp.addRow(2, label1,cb);
+                
+                screen.setToPlain();
             }
             
             @Override
@@ -322,6 +355,7 @@ public class Subscription {
                 gp.addRow(4, label1,field1); 
                 gp.addRow(5, label2,cb); 
 
+                screen.setToPlain();
                 group.selectedToggleProperty().addListener((ov,oldv,newv)->{
                     if (newv.getUserData().equals("service")) {
                         field.setDisable(false);
@@ -368,7 +402,7 @@ public class Subscription {
                 
                 gp.addRow(1, label,field);
                 gp.addRow(2, label1,cb); 
-                
+                screen.setToPlain();
             }
             
             @Override
@@ -395,7 +429,7 @@ public class Subscription {
                 field.setId("requestId");
                                                              
                 gp.addRow(1, label,field); 
-
+                screen.setToPlain();
             }
             
             @Override
@@ -425,7 +459,7 @@ public class Subscription {
                 cb.setMaxWidth(Double.MAX_VALUE);
                 
                 gp.addRow(1, label,cb); 
-
+                screen.setToPlain();
             }
             
             @Override
@@ -470,7 +504,7 @@ public class Subscription {
                 gp.addRow(2, label1,field1); 
                 gp.addRow(3, label2,field2);
                 gp.addRow(4, label3,cb);
-                
+                screen.setToPlain();                
             }
             
             @Override
@@ -520,7 +554,7 @@ public class Subscription {
                 gp.addRow(2, label1,cb1); 
                 gp.addRow(3, label2,cb2);
                 gp.addRow(4, label3,field3);
-                
+                screen.setToPlain();                
             }
             
             @Override
@@ -1165,12 +1199,12 @@ public class Subscription {
         return mapper.readTree(output).get("id").asText();
     }     
     
-    public String viewServiceOfferingBySubscription(Map<String,String> args) throws Exception {
+    public void viewServiceOfferingBySubscription(Map<String,String> args) throws Exception {
         String subscriptionId = args.get("subscriptionId");
         if (subscriptionId.isEmpty()) throw new RuntimeException("Subscription Id is empty");
         String dataType = args.get("output");       
         String out = viewServiceOfferingBySubscription(subscriptionId,dataType);
-        return out;
+        screen.outputText(out);
     }
     
     String viewServiceOfferingBySubscription(String sid, String dataType) throws Exception {        
@@ -1224,12 +1258,12 @@ public class Subscription {
     
     
     
-    public String viewServiceInstance(Map<String,String> args) throws Exception {
+    public void viewServiceInstance(Map<String,String> args) throws Exception {
         String serviceInstanceId = args.get("serviceInstanceId");
         String serviceSubscriptionId = args.get("serviceSubscriptionId");
         String output = args.get("output");
         String out = viewServiceInstance(serviceInstanceId,serviceSubscriptionId,output);
-        return out;
+        screen.outputText(out);
     }
     
     String viewServiceInstance(String ssid,String snid,String output) throws Exception {       
@@ -1290,12 +1324,13 @@ public class Subscription {
         return output;
     }
     
-    public String getAvailableValues(Map<String,String> args) throws Exception {
+    public void getAvailableValues(Map<String,String> args) throws Exception {
         String fieldId = args.get("fieldId");
         String format = args.get("format");
         String inputFieldName = args.get("inputFieldName");
         String inputFieldValue = args.get("inputFieldValue");
-        return getAvailableValues(fieldId,inputFieldName,inputFieldValue,format);
+        String out = getAvailableValues(fieldId,inputFieldName,inputFieldValue,format);
+        screen.outputText(out);
     }
     
     String getAvailableValues(String fieldId,String inputFieldName,String inputFieldValue, String format) throws Exception {
@@ -1338,10 +1373,10 @@ public class Subscription {
         return result;
     }
     
-    public String printToken(Map<String,String> args) throws Exception {
+    public void printToken(Map<String,String> args) throws Exception {
         String format = args.get("format");
         String output = printToken(format);
-        return output;
+        screen.outputText(output);
     }
     
     String printToken(String format) throws Exception {
@@ -1361,18 +1396,39 @@ public class Subscription {
         return out;
     }
     
-    public String listSubscriptionsByUserInOrganization(Map<String,String> args) throws Exception {
+    public void listSubscriptionsByUserInOrganization(Map<String,String> args) throws Exception {
         String organizationId = args.get("organizationId");
         if (organizationId == null) throw new RuntimeException("Organization Id is empty");
         String format = args.get("format");
         screen.outputLog("Selected Organization Id: " + organizationId, true);
-        String output = listSubscriptionsByUserInOrganization(organizationId,format);
-        return output;
+        screen.outputLog("Output Format: " + format, true);
+        String out = listSubscriptionsByUserInOrganization(organizationId);
+        if (format.equalsIgnoreCase("plain")) {
+            screen.outputText(out);
+        }
+        else if (format.equalsIgnoreCase("table")) {
+            ObjectMapper mapper = new ObjectMapper();
+            ArrayList<PersonSubscriptions> ps = new ArrayList<>();
+            Iterator<JsonNode> members = mapper.readTree(out).get("members").elements();
+            while(members.hasNext()) {
+                JsonNode member = members.next();
+                String un = member.get("userName").asText();
+                String active = Integer.toString(member.get("ext").get("csa_active_subscription_count").asInt());
+                String pending = Integer.toString(member.get("ext").get("csa_pending_subscription_count").asInt());
+                String paused = Integer.toString(member.get("ext").get("csa_paused_subscription_count").asInt());
+                String cancelled = Integer.toString(member.get("ext").get("csa_cancelled_subscription_count").asInt());
+                String expired = Integer.toString(member.get("ext").get("csa_expired_subscription_count").asInt());
+                String terminated = Integer.toString(member.get("ext").get("csa_terminated_subscription_count").asInt());
+                String requests = Integer.toString(member.get("ext").get("csa_pending_request_count").asInt());                
+                ps.add(new PersonSubscriptions(un,active,pending,paused,cancelled,expired,terminated,requests));
+            }
+            ObservableList<PersonSubscriptions> ops = FXCollections.observableArrayList(ps);
+            screen.fillTable(ops);
+        }
     }
     
-    String listSubscriptionsByUserInOrganization(String id,String format) throws Exception {
-        initCSAClient();
-  
+    String listSubscriptionsByUserInOrganization(String id) throws Exception {
+        initCSAClient();  
         String uri = "/csa/api/person/organization/" + id + "?start-index=0&page-size=30&sort=userName:ascending";
         screen.outputLog("Listing Subscriptions for Organization", true);
         //screen.outputLog(uri, true);
@@ -1410,11 +1466,11 @@ public class Subscription {
     }
     
     
-    public String viewRequestDetails(Map<String,String> args) throws Exception {
+    public void viewRequestDetails(Map<String,String> args) throws Exception {
         String id = args.get("requestId");
         if (id == null) raiseError("Request \"id\" is null");
         String output = viewRequestDetails(id);
-        return output;
+        screen.outputText(output);
     }
     
     String viewRequestDetails(String id) throws Exception {
@@ -1428,13 +1484,12 @@ public class Subscription {
         return out;
     }
     
-    //nucleus.dm.Subscription.viewSubscriptionDetails(java.util.HashMap)
-    public String viewSubscriptionDetails(Map<String,String> args) throws Exception {
+    public void viewSubscriptionDetails(Map<String,String> args) throws Exception {
         String id = args.get("subscriptionId");
         if (id == null) throw new RuntimeException("subscription id is empty");
         String api = args.get("apiName");
-        String output = viewSubscriptionDetails(id,api);
-        return output;
+        String out = viewSubscriptionDetails(id,api);
+        screen.outputText(out);
     }
     
     String viewSubscriptionDetails(String id, String api) throws Exception {       
@@ -1458,6 +1513,7 @@ public class Subscription {
         }
         return output;
     }
+    
     
     String viewSubscriptionOrder() throws Exception {
         String subscriptionId = arguments.get("subscriptionId");

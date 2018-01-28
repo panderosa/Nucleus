@@ -17,79 +17,79 @@ public class PersonSubscriptions {
     private SimpleStringProperty terminatedSubscription;
     private SimpleStringProperty pendingRequest;
 
-    public PersonSubscriptions(SimpleStringProperty userName, SimpleStringProperty activeSubscription, SimpleStringProperty pendingSubscription, SimpleStringProperty pausedSubscription, SimpleStringProperty cancelledSubscription, SimpleStringProperty expiredSubscription, SimpleStringProperty terminatedSubscription, SimpleStringProperty pendingRequest) {
-        this.userName = userName;
-        this.activeSubscription = activeSubscription;
-        this.pendingSubscription = pendingSubscription;
-        this.pausedSubscription = pausedSubscription;
-        this.cancelledSubscription = cancelledSubscription;
-        this.expiredSubscription = expiredSubscription;
-        this.terminatedSubscription = terminatedSubscription;
-        this.pendingRequest = pendingRequest;
+    public PersonSubscriptions(String userName, String activeSubscription, String pendingSubscription, String pausedSubscription, String cancelledSubscription, String expiredSubscription, String terminatedSubscription, String pendingRequest) {
+        this.userName = new SimpleStringProperty(userName);
+        this.activeSubscription = new SimpleStringProperty(activeSubscription);
+        this.pendingSubscription = new SimpleStringProperty(pendingSubscription);
+        this.pausedSubscription = new SimpleStringProperty(pausedSubscription);
+        this.cancelledSubscription = new SimpleStringProperty(cancelledSubscription);
+        this.expiredSubscription = new SimpleStringProperty(expiredSubscription);
+        this.terminatedSubscription = new SimpleStringProperty(terminatedSubscription);
+        this.pendingRequest = new SimpleStringProperty(pendingRequest);
     }
 
-    public SimpleStringProperty getUserName() {
-        return userName;
+    public String getUserName() {
+        return userName.get();
     }
 
-    public void setUserName(SimpleStringProperty userName) {
-        this.userName = userName;
+    public void setUserName(String userName) {
+        this.userName.set(userName);
     }
 
-    public SimpleStringProperty getActiveSubscription() {
-        return activeSubscription;
+    public String getActiveSubscription() {
+        return activeSubscription.get();
     }
 
-    public void setActiveSubscription(SimpleStringProperty activeSubscription) {
-        this.activeSubscription = activeSubscription;
+    public void setActiveSubscription(String activeSubscription) {
+        this.activeSubscription.set(activeSubscription);
     }
 
-    public SimpleStringProperty getPendingSubscription() {
-        return pendingSubscription;
+    public String getPendingSubscription() {
+        return pendingSubscription.get();
     }
 
-    public void setPendingSubscription(SimpleStringProperty pendingSubscription) {
-        this.pendingSubscription = pendingSubscription;
+    public void setPendingSubscription(String pendingSubscription) {
+        this.pendingSubscription.set(pendingSubscription);
     }
 
-    public SimpleStringProperty getPausedSubscription() {
-        return pausedSubscription;
+    public String getPausedSubscription() {
+        return pausedSubscription.get();
     }
 
-    public void setPausedSubscription(SimpleStringProperty pausedSubscription) {
-        this.pausedSubscription = pausedSubscription;
+    public void setPausedSubscription(String pausedSubscription) {
+        this.pausedSubscription.set(pausedSubscription);
     }
 
-    public SimpleStringProperty getCancelledSubscription() {
-        return cancelledSubscription;
+    public String getCancelledSubscription() {
+        return cancelledSubscription.get();
     }
 
-    public void setCancelledSubscription(SimpleStringProperty cancelledSubscription) {
-        this.cancelledSubscription = cancelledSubscription;
+    public void setCancelledSubscription(String cancelledSubscription) {
+        this.cancelledSubscription.set(cancelledSubscription);
     }
 
-    public SimpleStringProperty getExpiredSubscription() {
-        return expiredSubscription;
+    public String getExpiredSubscription() {
+        return expiredSubscription.get();
     }
 
-    public void setExpiredSubscription(SimpleStringProperty expiredSubscription) {
-        this.expiredSubscription = expiredSubscription;
+    public void setExpiredSubscription(String expiredSubscription) {
+        this.expiredSubscription.set(expiredSubscription);
     }
 
-    public SimpleStringProperty getTerminatedSubscription() {
-        return terminatedSubscription;
+    public String getTerminatedSubscription() {
+        return terminatedSubscription.get();
     }
 
-    public void setTerminatedSubscription(SimpleStringProperty terminatedSubscription) {
-        this.terminatedSubscription = terminatedSubscription;
+    public void setTerminatedSubscription(String terminatedSubscription) {
+        this.terminatedSubscription.set(terminatedSubscription);
     }
 
-    public SimpleStringProperty getPendingRequest() {
-        return pendingRequest;
+    public String getPendingRequest() {
+        return pendingRequest.get();
     }
 
-    public void setPendingRequest(SimpleStringProperty pendingRequest) {
-        this.pendingRequest = pendingRequest;
+    public void setPendingRequest(String pendingRequest) {
+        this.pendingRequest.set(pendingRequest);
     }
     
 }
