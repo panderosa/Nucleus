@@ -188,18 +188,28 @@ public class Screen extends Application {
     
     public GridPane addParametersPane() {
         GridPane pp  = new GridPane();
+        //pp.setPrefWidth(Double.MAX_VALUE);
+        
+        pp.setAlignment(Pos.TOP_LEFT);
         pp.setPadding(new Insets(10));
         pp.setVgap(5);
-        pp.setHgap(10);
+        pp.setHgap(5);
         pp.getStyleClass().add("grid");
+        //Label title = new Label("Action Parameters");
+        //title.getStyleClass().add("title");
+        //GridPane.setConstraints(title, 0, 0, 2, 1);
+        //pp.getChildren().add(0, title);
+        ColumnConstraints column1 = new ColumnConstraints(120);
+        ColumnConstraints column2 = new ColumnConstraints(200);
+        ColumnConstraints column3 = new ColumnConstraints(100);
+        
         Label title = new Label("Action Parameters");
         title.getStyleClass().add("title");
-        GridPane.setConstraints(title, 0, 0, 2, 1);
+        GridPane.setConstraints(title, 0, 0, 3, 1);
         pp.getChildren().add(0, title);
-        ColumnConstraints column1 = new ColumnConstraints(150);
-        ColumnConstraints column2 = new ColumnConstraints(200);
-        pp.getColumnConstraints().addAll(column1,column2);
-        pp.setAlignment(Pos.TOP_CENTER);
+        
+        pp.getColumnConstraints().addAll(column1,column2,column3);
+        pp.setAlignment(Pos.TOP_LEFT);
         return pp;
     }
     
@@ -469,7 +479,13 @@ public class Screen extends Application {
         });
         
         testMe.setOnAction(e->{
-           
+           try {
+               String out = sub.filterOfferings(null, null, null);
+               this.outputText(out);
+           }
+           catch(Exception exp) {
+               this.outputLog(this.processException(exp), true);
+           }
         });
         
         VBox vbox = new VBox();

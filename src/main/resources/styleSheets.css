@@ -28,3 +28,7 @@
     -fx-hbar-policy:always;
 }
 
+#subscriptionByPerson .table-cell {
+    -fx-alignment:CENTER_RIGHT;
+}
+

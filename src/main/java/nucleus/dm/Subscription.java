@@ -6,6 +6,8 @@
 package nucleus.dm;
 
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,20 +24,24 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.concurrent.Task;
 import javafx.geometry.HPos;
+import javafx.geometry.Insets;
 import javafx.scene.DepthTest;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -47,6 +53,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -157,50 +164,61 @@ public class Subscription {
         
         Action a150 = new Action("listSubscriptionsByUserInOrganization","List Subscriptions For CSA Organization") {           
             String selected;
-            String format;
+            String format = "plain";
             TableView table = null;
+            ObservableList<Organization> orgs = null;
             
+                        
             @Override
             public void buildMyPane(GridPane gp, Stage stage) {
                 ObservableList<Node> children = gp.getChildren();
-                children.remove(1, children.size());
-                
-                Label label = new Label("Select Organization");
+                if (children.size() > 1)
+                    children.remove(1,children.size());
+
+                Label label = new Label("Select Organization:");
                 ComboBox cb = new ComboBox();
-                cb.setItems(null);
                 cb.setId("organizationId");
-                // Set default Value
+                cb.setItems(orgs);
+                if (orgs == null)
+                    cb.setDisable(true);
+
                 cb.setMaxWidth(Double.MAX_VALUE);
-                cb.setDisable(true);
                 
+                Button button = new Button("Reload");
+                gp.addRow(2, label,cb,button);
                 
+                button.setOnAction(e-> {
+                    Task task = new Task<Void>() {
+                        @Override
+                        protected Void call() throws Exception {
+                            cb.setItems(null);
+                            orgs = getCSAOrganizations();                           
+                            cb.setItems(orgs);
+                            cb.setDisable(false);
+                            return null;
+                        }                     
+                    };
+                    new Thread(task).start();
+                });
+                
+                Label label1 = new Label("Output Format");
+                GridPane.setConstraints(label1, 0, 3);
                 ToggleGroup group = new ToggleGroup();               
                 RadioButton rb1 = new RadioButton("Plain View");
                 rb1.setUserData("plain");
                 rb1.setSelected(true);
-                GridPane.setConstraints(rb1, 1, 2);
+                GridPane.setConstraints(rb1, 1, 3);
                 GridPane.setHalignment(rb1, HPos.LEFT);
                 RadioButton rb2 = new RadioButton("Table View");
                 rb2.setUserData("table");
-                GridPane.setConstraints(rb2, 1, 2);
+                GridPane.setConstraints(rb2, 1, 3);
                 GridPane.setHalignment(rb2, HPos.RIGHT);
                 group.getToggles().addAll(rb1,rb2);
                 
-                gp.addRow(1, label,cb);
-                gp.getChildren().addAll(rb1,rb2);
+                children.addAll(label1,rb1,rb2);
                 
                 screen.setToPlain();
-                
-                //cb.setItems(getCSAOrganizations());
-                Task task = new Task<Void>() {
-                    @Override
-                    public Void call() throws Exception {
-                        cb.setItems(getCSAOrganizations());
-                        cb.setDisable(false);
-                        return null;
-                    }
-                };
-                new Thread(task).start(); 
+
                 
                 cb.setCellFactory(new Callback<ListView<Organization>,ListCell<Organization>>(){
                     @Override
@@ -261,7 +279,8 @@ public class Subscription {
                 TableColumn tc08 = new TableColumn("# Pending Requests");
                 tc08.setCellValueFactory(new PropertyValueFactory<PersonSubscriptions,String>("pendingRequest"));
                 table.getColumns().addAll(tc01,tc02,tc03,tc04,tc05,tc06,tc07,tc08);
-                table.setPrefWidth(800);  
+                table.setPrefWidth(800);
+                table.setId("subscriptionByPerson");
                 return table;
             }
             
@@ -520,6 +539,106 @@ public class Subscription {
 
         };
         
+        Action a245 = new Action("testSelectionLists","Test Selection Lists") {           
+            ArrayList<Offering> offerings = null;
+            ObservableList<Offering> olist = null;
+            ObservableList<String> versions = null;
+            
+            @Override
+            public void buildMyPane(GridPane gp, Stage stage) {
+                ObservableList<Node> children = gp.getChildren();
+                if (children.size() > 1)
+                    children.remove(1, children.size());
+                
+                Label label1 = new Label("Select Service Offering");
+                ComboBox cb1 = new ComboBox();
+                cb1.setItems(null);
+                cb1.setId("offeringID");
+                // Set default Value
+                cb1.setMaxWidth(Double.MAX_VALUE);
+                
+                if (offerings == null)
+                    cb1.setDisable(true);
+                
+                Button button1 = new Button("Reload");
+                gp.addRow(2, label1,cb1,button1);
+                
+                Label label2 = new Label("Select Offering Version");
+                ComboBox cb2 = new ComboBox();
+                cb2.setItems(versions);
+                cb2.setId("offeringVersion");
+                if (versions == null)
+                    cb2.setDisable(true);
+                cb2.setMaxWidth(Double.MAX_VALUE);
+                
+                gp.addRow(3, label2,cb2);
+                
+                button1.setOnAction(e-> {
+                    Task task = new Task<Void>() {
+                        @Override
+                        protected Void call() throws Exception {
+                            cb1.setItems(null);
+                            offerings = getOfferings();
+                            olist = FXCollections.observableArrayList(offerings);
+                            cb1.setItems(olist);
+                            cb1.setDisable(false);
+                            return null;
+                        }                     
+                    };
+                    new Thread(task).start();
+                });
+                
+                
+                
+                cb1.setCellFactory(new Callback<ListView<Offering>,ListCell<Offering>>(){
+                    @Override
+                    public ListCell<Offering> call(ListView<Offering> param) {
+                        ListCell<Offering> cell = new ListCell<Offering>() {
+                            @Override
+                            protected void updateItem(Offering itm, boolean bln) {                               
+                                super.updateItem(itm, bln); //To change body of generated methods, choose Tools | Templates.
+                                if (itm!= null) {
+                                    setText(itm.getDisplayName());
+                                }
+                            }                      
+                        };
+                       return cell;
+                    };
+                });
+                
+                cb1.getSelectionModel().selectedItemProperty().addListener((ob,oo,no)->{
+                    cb2.setItems(null);
+                    versions = FXCollections.observableArrayList(getListOfVersions(((Offering)no).getDisplayName()));
+                    cb2.setItems(versions);
+                    cb2.setDisable(false);
+                });
+
+                screen.setToPlain();                
+            }
+            
+            List<String> getListOfVersions (String dn) {
+                List<Offering> sl = offerings.stream().filter(o -> o.getDisplayName().equalsIgnoreCase(dn) ).collect(Collectors.toList());
+                List<String> versions = new ArrayList<>();
+                for(Offering of : sl) {
+                    versions.add(of.getOfferingVersion());
+                }
+                Collections.sort(versions);
+                return versions;
+            }
+            
+            @Override
+            public void getParameters(GridPane gp) throws Exception {
+                Map<String,String> params = new HashMap<>();
+                params.put("action", getName()); 
+                params.put("fieldId", ((TextField) gp.lookup("#fieldId")).getText());
+                params.put("inputFieldName", ((TextField) gp.lookup("#inputFieldName")).getText());
+                params.put("inputFieldValue", ((TextField) gp.lookup("#inputFieldValue")).getText());
+                params.put("format", ((ChoiceBox<String>) gp.lookup("#format")).getValue());
+                setParameters(params);
+            }
+
+        };
+        
 
         Action a260 = new Action("updateProcessInstance","Update CSA Process Instance") {           
          
@@ -570,7 +689,7 @@ public class Subscription {
 
         };
                  
-        actions = Arrays.asList(a100,a150,a200,a215,a210,a220,a230,a240,a260);
+        actions = Arrays.asList(a100,a150,a200,a215,a210,a220,a230,a240,a245,a260);
     }
      
     
@@ -587,23 +706,6 @@ public class Subscription {
         return out;
     }
     
-    /*public String readConfiguration(File file) {
-        String out = null;
-        try {
-            ObjectMapper mapper = new ObjectMapper();   
-            mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-            JsonNode root = mapper.readTree(file);
-            setUpConfiguration(root);
-            out = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);        
-        }
-        catch (Exception e) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
-            PrintWriter pw = new PrintWriter(baos,true);
-            e.printStackTrace(pw);
-            out = baos.toString();
-        }
-        return out;    
-    }*/
     
     private String decryptPassword(String encpassword) throws Exception {
         Decryptor decryptor = new Decryptor();
@@ -618,46 +720,6 @@ public class Subscription {
         configuration = mapper.readValue(file, Configuration.class);
     }
     
-    /*private void setUpConfiguration(JsonNode root) throws Exception {  
-        configuration = new HashMap<>();
-        String idmUser = root.get("idmUser").get("name").asText();
-        configuration.put("idmUser", new Conf("IDM Transport User",idmUser,"STRING","plain"));
-        String idmPassword = decryptPassword(root.get("idmUser").get("password").asText());
-        configuration.put("idmPassword", new Conf("IDM Transport Password",idmPassword,"STRING","hidden"));
-        String transportUser = root.get("transportUser").get("name").asText();
-        configuration.put("transportUser", new Conf("CSA Transport User",transportUser,"STRING","plain"));
-        String transportPassword = decryptPassword(root.get("transportUser").get("password").asText());
-        configuration.put("transportPassword", new Conf("CSA Transport Password",transportPassword,"STRING","hidden"));
-        String csaConsumer = root.get("defaultConsumer").asText();
-        configuration.put("csaConsumer", new Conf("Consumer User",csaConsumer,"STRING","plain"));
-        String csaConsumerPassword = decryptPassword(root.get(csaConsumer).asText());
-        configuration.put("csaConsumerPassword", new Conf("Consumer Password",csaConsumerPassword,"STRING","hidden"));
-        String csaTenant = root.get("defaultTenant").asText();
-        configuration.put("csaTenant", new Conf("Consumer Tenant",csaTenant,"STRING","plain"));
-        String onBehalf = root.get("onBehalf").asText();
-        configuration.put("onBehalf", new Conf("Manage On Behalf User",onBehalf,"STRING","plain"));
-        String csaAdmin = root.get("defaultPrivilegedUser").asText();
-        configuration.put("csaAdmin", new Conf("CSA Privileged User",csaAdmin,"STRING","plain"));
-        String csaAdminPassword = decryptPassword(root.get(csaAdmin).asText());
-        configuration.put("csaAdminPassword", new Conf("Priviliged Password",csaAdminPassword,"STRING","hidden"));
-        String csaAdminOrg = root.get("defaultAdminOrganization").asText();
-        configuration.put("csaAdminOrg", new Conf("Provider Organization",csaAdminOrg,"STRING","plain"));       
-        String csaServer = root.get("csaAS").get("Server").asText();
-        configuration.put("csaServer", new Conf("CSA Server",csaServer,"STRING","plain"));     
-        int csaPort = root.get("csaAS").get("Port").asInt();
-        configuration.put("csaPort", new Conf("TCP Port",Integer.toString(csaPort),"INT","plain"));  
-        String csaProtocol = root.get("csaAS").get("Protocol").asText();
-        configuration.put("csaProtocol", new Conf("Transport Protocol",csaProtocol,"STRING","plain")); 
-    }
-    
-    
-    Map<String,Conf> getConfiguration() {
-        return configuration;
-    }
-    
-    void setConfiguration(Map<String,Conf> configuration) {
-        this.configuration = configuration;
-    }*/
     
     Configuration getConfiguration() {
         return configuration;
@@ -1324,6 +1386,47 @@ public class Subscription {
         return output;
     }
     
+    public ArrayList<Offering> getOfferings() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES);
+        mapper.addMixIn(Offering.class, OfferingMixIn.class);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
+        //ObservableList<Map<String,String>> items = FXCollections.observableArrayList();
+        ArrayList<Offering> items = new ArrayList<>();
+        try {
+            String out = filterOfferings(null,null,null);
+            Iterator<JsonNode> offerings = mapper.readTree(out).get("members").elements();
+            while(offerings.hasNext()) {
+                JsonNode offering = offerings.next();
+                String ofs = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(offering);
+                Offering ofr = mapper.readValue(ofs, Offering.class);
+                items.add(ofr);
+            }
+        }
+        catch(Exception exp) {
+            screen.outputLog(this.processException(exp), true);
+        }
+        return items;
+    }
+    
+    String filterOfferings(String name,String approval, String category) throws Exception {
+        initCSAClient();
+        String token = requestToken(); 
+        String uri = "/csa/api/mpp/mpp-offering/filter";
+        screen.outputLog("Filtering Service Offerings", true);
+        //screen.outputLog(uri, true);
+        Map<String,String> filter = new HashMap<>();
+        filter.put("name", name);
+        filter.put("approval", approval);
+        filter.put("category", category);
+        ObjectMapper mapper = new ObjectMapper();
+        String payload = mapper.writeValueAsString(filter);
+        String out = csa.postHttp(token, null, null, uri, payload, "application/json", "application/json");
+        return out;
+    }
+    
     public void getAvailableValues(Map<String,String> args) throws Exception {
         String fieldId = args.get("fieldId");
         String format = args.get("format");
@@ -1339,10 +1442,12 @@ public class Subscription {
         String fields = "";
         if (inputFieldName != null && !inputFieldName.isEmpty() && inputFieldValue != null && !inputFieldValue.isEmpty())
             fields = String.format("%s=%s", inputFieldName,inputFieldValue);
+        else
+            fields = "name=value";
         initCSAClient();
         String userId = getUserId();
         String uri = "/csa/rest/availablevalues/" + fieldId + "?userIdentifier=" + userId;
-        screen.outputLog("Getting a field available values", true);
+        screen.outputLog("Getting field available values", true);
         String output = csa.postHttp(null, configuration.getCsaTransportUser(), configuration.getCsaTransportPassword(), uri, fields, "application/json", "application/json");
         ObjectMapper mapper = new ObjectMapper();
         if (format.equalsIgnoreCase("short")) {
