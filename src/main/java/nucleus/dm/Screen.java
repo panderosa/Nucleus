@@ -327,6 +327,7 @@ public class Screen extends Application {
                 /*String txt = sub.readConfiguration(file);
                 configuration = sub.getConfiguration();*/
                 try {
+                    cfgs.clear();
                     sub.setupConfiguration(file).stream().forEach(t->cfgs.add(t));
                     List<String> envs = new ArrayList<>();
                     cfgs.stream().forEach(i -> {
