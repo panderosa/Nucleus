@@ -8,6 +8,7 @@ package nucleus.dm;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -539,10 +540,11 @@ public class Subscription {
 
         };
         
-        Action a245 = new Action("testSelectionLists","Test Selection Lists") {           
+        Action a245 = new Action("testSelections","Test Selection Lists") {           
             ArrayList<Offering> offerings = null;
             ObservableList<Offering> olist = null;
             ObservableList<String> versions = null;
+            Offering selected = null;
             
             @Override
             public void buildMyPane(GridPane gp, Stage stage) {
@@ -553,7 +555,7 @@ public class Subscription {
                 Label label1 = new Label("Select Service Offering");
                 ComboBox cb1 = new ComboBox();
                 cb1.setItems(null);
-                cb1.setId("offeringID");
+                cb1.setId("displayName");
                 // Set default Value
                 cb1.setMaxWidth(Double.MAX_VALUE);
                 
@@ -566,7 +568,7 @@ public class Subscription {
                 Label label2 = new Label("Select Offering Version");
                 ComboBox cb2 = new ComboBox();
                 cb2.setItems(versions);
-                cb2.setId("offeringVersion");
+                cb2.setId("version");
                 if (versions == null)
                     cb2.setDisable(true);
                 cb2.setMaxWidth(Double.MAX_VALUE);
@@ -612,6 +614,13 @@ public class Subscription {
                     cb2.setItems(versions);
                     cb2.setDisable(false);
                 });
+                
+                cb2.getSelectionModel().selectedItemProperty().addListener((ob,oo,no)->{
+                    String vrs = (String) no;
+                    String dn = ((Offering) cb1.getValue()).getDisplayName();
+                    selected = offerings.stream().filter(o -> o.getOfferingVersion().equalsIgnoreCase(vrs) && o.getDisplayName().equalsIgnoreCase(dn)).findFirst().get();
+                    
+                });
 
                 screen.setToPlain();                
             }
@@ -630,10 +639,9 @@ public class Subscription {
             public void getParameters(GridPane gp) throws Exception {
                 Map<String,String> params = new HashMap<>();
                 params.put("action", getName()); 
-                params.put("fieldId", ((TextField) gp.lookup("#fieldId")).getText());
-                params.put("inputFieldName", ((TextField) gp.lookup("#inputFieldName")).getText());
-                params.put("inputFieldValue", ((TextField) gp.lookup("#inputFieldValue")).getText());
-                params.put("format", ((ChoiceBox<String>) gp.lookup("#format")).getValue());
+                params.put("offeringId", selected.getId());
+                params.put("catalogId", selected.getCatalogId());
+                params.put("category", selected.getCategory().get("name"));
                 setParameters(params);
             }
 
@@ -712,12 +720,20 @@ public class Subscription {
         return decryptor.decryptPassword(encpassword);
     }
     
-    public void setupConfiguration(File file) throws Exception {
+    /*public void setupConfiguration(File file) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         configuration = new Configuration();
         mapper.configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         configuration = mapper.readValue(file, Configuration.class);
+    }*/
+    
+    public List<Configuration> setupConfiguration(File file) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        configuration = new Configuration();
+        mapper.configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return mapper.readValue(file, new TypeReference<List<Configuration>>(){});
     }
     
     
@@ -1259,7 +1275,13 @@ public class Subscription {
         String output = csa.getHttp(null, configuration.getCsaTransportUser(), configuration.getCsaTransportPassword(), uri, ac);
         ObjectMapper mapper = new ObjectMapper();        
         return mapper.readTree(output).get("id").asText();
-    }     
+    }   
+    
+    void testSelections(Map<String,String> args) throws Exception {
+        args.forEach((a,b)-> {
+            screen.outputText(a + " " + b);
+        });
+    }
     
     public void viewServiceOfferingBySubscription(Map<String,String> args) throws Exception {
         String subscriptionId = args.get("subscriptionId");

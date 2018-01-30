@@ -13,6 +13,7 @@ import java.io.PrintWriter;
  * @author Administrator
  */
 public class Configuration {
+    private String environment;
     private String csaIdmUser;
     private String csaIdmPassword;
     private String csaTransportUser;
@@ -32,6 +33,15 @@ public class Configuration {
     public Configuration() throws Exception {
     }
 
+    public String getEnvironment() {
+        return environment;
+    }
+
+    public void setEnvironment(String environment) {
+        this.environment = environment;
+    }
+
+    
     public String getCsaIdmUser() {
         return csaIdmUser;
     }

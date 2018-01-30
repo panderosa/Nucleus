@@ -14,8 +14,10 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Iterator;
+import java.util.List;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -26,6 +28,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -214,10 +217,11 @@ public class Screen extends Application {
     }
     
     public GridPane addConfigurationPane() {
+        List<Configuration> cfgs = new ArrayList<>();
         GridPane cp = new GridPane();
         cp.setPadding(new Insets(10));
         cp.setVgap(5);
-        cp.setHgap(10);
+        cp.setHgap(5);
         cp.getStyleClass().add("grid");
         Label title = new Label("Infrastructure Configuration");
         title.getStyleClass().add("title");
@@ -227,87 +231,93 @@ public class Screen extends Application {
         ColumnConstraints column2 = new ColumnConstraints(200);
         cp.getColumnConstraints().addAll(column1,column2);
         
+        Label label0 = new Label("Select Environment");
+        ComboBox cb0 = new ComboBox();
+        cb0.setItems(null);
+        cb0.setDisable(true);
+        cb0.setMaxWidth(Double.MAX_VALUE);
+        cp.addRow(1, label0,cb0);
+        
         Label label1 = new Label("IDM Transport User");
         TextField field1 = new TextField();
         field1.setId("csaIdmUser");
-        cp.addRow(1, label1,field1);
+        cp.addRow(2, label1,field1);
         
         Label label2 = new Label("IDM User Password");
         PasswordField pf2 = new PasswordField();
         pf2.setId("csaIdmPassword");
-        cp.addRow(2, label2,pf2);
+        cp.addRow(3, label2,pf2);
         
         Label label3 = new Label("CSA Transport User");
         TextField field3 = new TextField();
         field3.setId("csaTransportUser");
-        cp.addRow(3, label3,field3); 
+        cp.addRow(4, label3,field3); 
 
         Label label4 = new Label("Transport User Password");
         PasswordField pf4 = new PasswordField();
         pf4.setId("csaTransportPassword");
-        cp.addRow(4, label4,pf4);
+        cp.addRow(5, label4,pf4);
         
         Label label5 = new Label("CSA Default Consumer");
         TextField field5 = new TextField();
         field5.setId("csaConsumer");
-        cp.addRow(5, label5,field5); 
+        cp.addRow(6, label5,field5); 
 
         Label label6 = new Label("CSA Consumer Password");
         PasswordField pf6 = new PasswordField();
         pf6.setId("csaConsumerPassword");
-        cp.addRow(6, label6,pf6);
+        cp.addRow(7, label6,pf6);
         
         Label label7 = new Label("CSA Consumer Tenant");
         TextField field7 = new TextField();
         field7.setId("csaConsumerTenant");
-        cp.addRow(7, label7,field7);
+        cp.addRow(8, label7,field7);
         
         Label label8 = new Label("Manage OnBehalf User");
         TextField field8 = new TextField();
         field8.setId("csaOnBehalfConsumer");
-        cp.addRow(8, label8,field8);
+        cp.addRow(9, label8,field8);
         
         Label label9 = new Label("CSA Administrator");
         TextField field9 = new TextField();
         field9.setId("csaAdminUser");
-        cp.addRow(9, label9,field9); 
+        cp.addRow(10, label9,field9); 
 
         Label label10 = new Label("CSA Administrator Password");
         PasswordField pf10 = new PasswordField();
         pf10.setId("csaAdminPassword");
-        cp.addRow(10, label10,pf10);
+        cp.addRow(11, label10,pf10);
         
         Label label11 = new Label("CSA Provider Org");
         TextField field11 = new TextField();
         field11.setId("csaProviderOrg");
-        cp.addRow(11, label11,field11); 
+        cp.addRow(12, label11,field11); 
 
         Label label12 = new Label("CSA Server");
         TextField field12 = new TextField();
         field12.setId("csaServer");
-        cp.addRow(12, label12,field12); 
+        cp.addRow(13, label12,field12); 
         
         Label label13 = new Label("CSA Transport Protocol");
         TextField field13 = new TextField();
         field13.setId("csaProtocol");
-        cp.addRow(13, label13,field13); 
+        cp.addRow(14, label13,field13); 
         
         Label label14 = new Label("CSA TCP Port");
         TextField field14 = new TextField();
         field14.setId("csaPort");
-        cp.addRow(14, label14,field14);
+        cp.addRow(15, label14,field14);
         
         Button button1 = new Button("Load From File");
         button1.setId("loadConfiguration");
         GridPane.setHalignment(button1, HPos.LEFT);
-        cp.add(button1, 1, 15);
+        cp.add(button1, 1, 16);
         
         Button button2 = new Button("Apply Changes");
         button2.setId("apply");
         GridPane.setHalignment(button2, HPos.RIGHT);
-        cp.add(button2, 1, 15);
+        cp.add(button2, 1, 16);
 
-        
         cp.setAlignment(Pos.TOP_CENTER);
         
         button1.setOnAction(e->{
@@ -317,14 +327,27 @@ public class Screen extends Application {
                 /*String txt = sub.readConfiguration(file);
                 configuration = sub.getConfiguration();*/
                 try {
-                    sub.setupConfiguration(file);
-                    Configuration configuration = sub.getConfiguration();
-                    updateConfigurationPane(configuration);
+                    sub.setupConfiguration(file).stream().forEach(t->cfgs.add(t));
+                    List<String> envs = new ArrayList<>();
+                    cfgs.stream().forEach(i -> {
+                        envs.add(i.getEnvironment());
+                    });
+                    cb0.setItems(FXCollections.observableArrayList(envs));
+                    cb0.setDisable(false);
+                    //Configuration configuration = sub.getConfiguration();
+                    //updateConfigurationPane(configuration);
                 }
                 catch(Exception exp) {
                     outputLog(processException(exp),true);
                 }
             }                    
+        });
+        
+        cb0.getSelectionModel().selectedItemProperty().addListener((ob,ov,nv) -> {
+            String myenv = nv.toString();
+            Configuration current = cfgs.stream().filter(t -> t.getEnvironment().equalsIgnoreCase(myenv)).findFirst().get();
+            updateConfigurationPane(current);
+            sub.setConfiguration(current);
         });
         
         button2.setOnAction( v -> {
